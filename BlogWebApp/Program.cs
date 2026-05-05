@@ -117,9 +117,9 @@ static async Task<BlogCosmosDbService> InitializeCosmosBlogClientInstanceAsync(I
     {
         const string helloWorldPostHtml = @"
                 <p>Hi there!</p>
-                <p>This is sample code for the article <a target='_blank' href='https://docs.microsoft.com/en-us/azure/cosmos-db/how-to-model-partition-example'>How to model and partition data on Azure Cosmos DB using a real-world example</a>.</p>
+                <p>Welcome to CosmicBlog — a learn-in-public blog engine on .NET 10 + Azure Cosmos DB. The Cosmos partition strategy is based on the Microsoft docs article <a target='_blank' href='https://docs.microsoft.com/en-us/azure/cosmos-db/how-to-model-partition-example'>How to model and partition data on Azure Cosmos DB using a real-world example</a>.</p>
                 <p>To login as the Blog Administrator, register and login as the username <b>jsmith</b>. The Admin username can be changed in the BlogWebApp appsettings.json file.</p>
-                <p>Please post any issues that you have with this sample code to the repository at <a target='_blank' href='https://github.com/jwidmer/AzureCosmosDbBlogExample/issues'>https://github.com/jwidmer/AzureCosmosDbBlogExample/issues</a></p>
+                <p>Please post any issues that you have with this code to the repository at <a target='_blank' href='https://github.com/townbackyard/CosmicBlog/issues'>https://github.com/townbackyard/CosmicBlog/issues</a></p>
         ";
 
         var helloWorldPost = new BlogPost
