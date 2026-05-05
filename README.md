@@ -1,70 +1,57 @@
-# AzureCosmosDbBlogExample
+# CosmicBlog
 
-## About the code
-This repository contains sample code for the article [How to model and partition data on Azure Cosmos DB using a real-world example](https://docs.microsoft.com/en-us/azure/cosmos-db/how-to-model-partition-example).  The code included in this sample is intended to further illustrate the concepts from the article.
+A learn-in-public blog engine on **.NET 10 + Azure Cosmos DB**. CosmicBlog runs [jeffwidmer.me](https://jeffwidmer.me) and is open-sourced under the MIT license so you can self-host your own.
 
+CosmicBlog began as a fork of [jwidmer/AzureCosmosDbBlogExample](https://github.com/jwidmer/AzureCosmosDbBlogExample) (the sample for the Microsoft docs article [How to model and partition data on Azure Cosmos DB using a real-world example](https://docs.microsoft.com/en-us/azure/cosmos-db/how-to-model-partition-example)). The upstream remains a clean teaching example; CosmicBlog is the production engine that builds on it with additional features and continues to evolve.
 
+## Features beyond the upstream sample
+
+- **Configurable blog name** via `appsettings.json` — drop in your own brand without forking code.
+- **Base64 image extraction on save** — when you paste a screenshot into the editor, CosmicBlog extracts it from the post body, uploads it to Azure Blob Storage, and rewrites the body with a URL. Keeps Cosmos documents small.
+- **Modern stack throughout** — .NET 10, Azure Functions v4 isolated worker, Azure Cosmos DB SDK 3.x, Bootstrap 5, TinyMCE 7, no jQuery.
+
+## Architecture
+
+Two projects in one solution:
+
+- **`BlogWebApp`** — ASP.NET Core MVC web frontend. Reads/writes posts from the `Posts` container; reads recent posts from the `Feed` container for the homepage feed.
+- **`BlogFunctionApp`** — Azure Functions (isolated worker) that consume the Cosmos DB change feed on `Posts` and project documents into the `Feed` container, plus maintain a per-user post index in `Users`. See the upstream Microsoft docs article for the partition-strategy reasoning.
 
 ## Prerequisites
-1. **Visual Studio 2026 (or current latest) with the .NET 10 SDK installed** - You can download Visual Studio Community Edition [here](https://visualstudio.microsoft.com/downloads/).
-1. **.NET 10 SDK** - You can download the .NET 10 SDK [here](https://dotnet.microsoft.com/download).
-1. **Azure Functions Core Tools v4** - Required for running the BlogFunctionApp locally. Installation instructions can be found [here](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local).
-1. **Azure Cosmos DB Emulator** - More information on how to install and use the Azure Cosmos DB emulator can be found [here](https://docs.microsoft.com/en-us/azure/cosmos-db/local-emulator).
-1. **Azure Storage Emulator** - More information on how to install and use Azure Storage Emulator can be found [here](https://docs.microsoft.com/en-us/azure/storage/common/storage-use-emulator).
 
+1. **Visual Studio 2026 (or current latest)** with the .NET 10 SDK — [download](https://visualstudio.microsoft.com/downloads/).
+2. **.NET 10 SDK** — [download](https://dotnet.microsoft.com/download).
+3. **Azure Functions Core Tools v4** — [install instructions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local).
+4. **Azure Cosmos DB Emulator** (Linux Docker container recommended) or a live Cosmos DB account.
+5. **Azurite** (Azure Storage Emulator) for the Functions runtime and image-upload pipeline.
 
-## Running this sample
+## Running locally
+
 1. Clone this repository.
-1. From Visual Studio, open the **AzureCosmosDbBlogExample.sln** file from the root directory.
-1. In Visual Studio Build menu, select Build Solution (or Press F6).
-1. Start Azure Storage Emulator.
-1. Start Azure Cosmos DB Emulator.
-1. Change the Azure Cosmos Database Name (Optional).
+2. Start the Cosmos DB Emulator and Azurite.
+3. Open the solution in Visual Studio (or run each project with `dotnet run` / `func start` from the command line).
+4. Set both `BlogWebApp` and `BlogFunctionApp` as startup projects, then F5.
+5. Register a user (no password needed in local dev — see "Authentication notes" below).
 
-	*The Azure Cosmos DB Database Name defaults to **MyBlog**.  If you want to change this you will need to update the name in **both** the BlogFunctionApp (local.settings.json) and the BlogWebApp (appsettings.json).*
+## Configuration
 
-1. Set both projects BlogFunctionApp and BlogWebApp to startup when the solution runs.
+Settings of interest in `BlogWebApp/appsettings.json`:
 
-	*Only the BlogWebApp project will start when you run the solution.  To also get the Azure Function App BlogFunctionApp to start, right-click on the Solution and choose Set as Startup Project and then set both projects to start.*
+- **`BlogName`** — the title shown in the page `<title>`, navbar brand, footer, and homepage h1.
+- **`AdminUsername`** — the username that gets the Admin role on login (default `jsmith`).
+- **`CosmosDbBlog.Account` / `Key` / `DatabaseName`** — Cosmos endpoint configuration.
+- **`StorageBlobConnectionString`** — Azure Blob connection string used by the image-upload pipeline. Defaults to `UseDevelopmentStorage=true` (Azurite). Override at deploy time via environment variables or Key Vault — never commit a real key.
 
-1. You can now run and debug the application locally by pressing F5 in Visual Studio.
-1. You can register as any username to create a new user (this sample does not require a password for logins).
+## Authentication notes
 
-	*To login as the Blog Administrator, register and login as the username **jsmith**.  The Admin username can be changed in the BlogWebApp appsettings.json file.*
+The current implementation uses a passwordless registration shortcut for local development convenience. **Replace this with real authentication before deploying to production.** Suggested: ASP.NET Core Identity with email/password, or Microsoft Entra ID with personal Microsoft account sign-in.
 
-## Running this sample using GitHub Codespaces 
-This repository can be run within a GitHub Codespace (Preview).
+To log in as the blog admin (the role that can create new posts), register the username matching `AdminUsername` in `appsettings.json` (default: `jsmith`).
 
-**From Visual Studio 2019 Preview**
+## License
 
-1. From the Visual Studio 2019 Preview home screen click **Connect to a codespace**.
-1. Enter the repository url and start your codespace.
-1. Once the codespace loads, open the Terminal window (View > Terminal).
-1. Run the following to install the prerequisites (Azure Cosmos DB Emulator, Azure Storage Emulator, and SQL Server for Azure Storage Emulator):
+MIT. See `LICENSE`.
 
-	`devinit init`
+## Credits
 
-	Note: I had to run this command twice.  The first time it takes about 5 minutes while SQL Server is downloaded and installed and then it fails.  The second time it will run successfully but much faster than the first since SQL Server will already be installed.
-1. From within the Terminal window, change your directory to *C:\Program Files\Azure Cosmos DB Emulator*.
-1. Run *.\Microsoft.Azure.Cosmos.Emulator.exe start* to start the Azure Cosmos DB Emulator.
-
-	`PS C:\Program Files\Azure Cosmos DB Emulator> .\Microsoft.Azure.Cosmos.Emulator.exe start`
-	
-1. Now hit F5 to run the application and it will start in your browser.
-
-
-
-
-
-## More information
-
-- [How to model and partition data on Azure Cosmos DB using a real-world example](https://docs.microsoft.com/en-us/azure/cosmos-db/how-to-model-partition-example)
-- [Azure Cosmos DB Documentation](https://docs.microsoft.com/azure/cosmos-db/index)
-- [Azure Cosmos DB .NET SDK for SQL API](https://docs.microsoft.com/azure/cosmos-db/sql-api-sdk-dotnet)
-- [Azure Cosmos DB .NET SDK Reference Documentation](https://docs.microsoft.com/dotnet/api/overview/azure/cosmosdb?view=azure-dotnet)
-
-
-
-## .NET 10 modernization (2026)
-
-This project was upgraded from .NET Core 3.1 + Azure Functions v3 (in-process) to **.NET 10 + Azure Functions v4 (isolated worker)**. The teaching focus on Cosmos DB partition strategy is unchanged. The prior commits remain available in the git history if you want to follow along with the original .NET Core 3.1 sample paired with the Microsoft docs article.
+- [jwidmer/AzureCosmosDbBlogExample](https://github.com/jwidmer/AzureCosmosDbBlogExample) — the upstream sample CosmicBlog forks from. The change-feed flow and partition strategy come from the Microsoft docs article it accompanies.
