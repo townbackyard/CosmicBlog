@@ -1,7 +1,8 @@
 ﻿@model BlogHomePageViewModel
+@inject Microsoft.Extensions.Options.IOptions<BlogWebApp.AppSettings> AppSettings
 
 
-<h1>My Azure Cosmos DB Blog Sample Home Page</h1>
+<h1>@AppSettings.Value.BlogName</h1>
 
 
 @if (!Model.BlogPostsMostRecent.Any())

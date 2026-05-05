@@ -1,9 +1,10 @@
-﻿<!DOCTYPE html>
+﻿@inject Microsoft.Extensions.Options.IOptions<BlogWebApp.AppSettings> AppSettings
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Azure Cosmos DB Blog Example</title>
+    <title>@ViewData["Title"] - @AppSettings.Value.BlogName</title>
     <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css" />
     @RenderSection("Head", required: false)
 </head>
@@ -11,7 +12,7 @@
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container">
-                <a class="navbar-brand" asp-area="" asp-controller="Blog" asp-action="HomePage">Azure Cosmos DB Blog Example</a>
+                <a class="navbar-brand" asp-area="" asp-controller="Blog" asp-action="HomePage">@AppSettings.Value.BlogName</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
@@ -60,7 +61,7 @@
 
     <footer class="border-top footer text-muted">
         <div class="container">
-            &copy; @DateTime.Now.Year - Azure Cosmos DB Blog Example - <a asp-area="" asp-controller="Blog" asp-action="Privacy">Privacy</a>
+            &copy; @DateTime.Now.Year - @AppSettings.Value.BlogName - <a asp-area="" asp-controller="Blog" asp-action="Privacy">Privacy</a>
         </div>
     </footer>
     <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
