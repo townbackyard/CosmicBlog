@@ -29,6 +29,12 @@ builder.Services
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddControllersWithViews();
 
+// Image storage manager — uploads embedded base64 images out of post content into Azure Blob Storage
+// (prevents Cosmos DB document bloat when authors paste screenshots into TinyMCE).
+var storageBlobConnectionString = builder.Configuration.GetValue<string>("StorageBlobConnectionString")
+    ?? throw new InvalidOperationException("StorageBlobConnectionString is not configured.");
+builder.Services.AddSingleton<IImageStorageManager>(new ImageStorageManager(storageBlobConnectionString));
+
 // Cosmos DB initialization — same blocking initialization as the 3.x version,
 // preserved intentionally for teaching clarity.
 var cosmosService = await InitializeCosmosBlogClientInstanceAsync(
