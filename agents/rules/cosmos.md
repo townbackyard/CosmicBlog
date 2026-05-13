@@ -45,9 +45,13 @@ catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
 
 ```csharp
 var query = new QueryDefinition(
-    "SELECT TOP @count * FROM p WHERE p.type = @type ORDER BY p.dateCreated DESC")
-    .WithParameter("@count", count)
+    $"SELECT TOP {count} * FROM p WHERE p.type = @type ORDER BY p.dateCreated DESC")
     .WithParameter("@type", type);
+
+// Note: Cosmos DB SQL's TOP operator requires a literal integer, NOT
+// a parameter — `SELECT TOP @count` is invalid and will fail at
+// execution time. Interpolating an `int` value is safe from injection
+// because the type doesn't accept arbitrary strings.
 
 var results = new List<BlogPost>();
 var iterator = container.GetItemQueryIterator<BlogPost>(query);
@@ -59,7 +63,7 @@ while (iterator.HasMoreResults)
 return results;
 ```
 
-**Always parameterize.** Never concatenate user input into the SQL string — Cosmos SQL is SQL injection-able. The `QueryDefinition` + `WithParameter` pattern is the only acceptable form.
+**Always parameterize.** Never concatenate user input into the SQL string — Cosmos SQL is SQL injection-able. The `QueryDefinition` + `WithParameter` pattern is the only acceptable form for string/user-supplied values. The `TOP N` literal is the one exception: it must be an interpolated `int`, not a `@param`.
 
 ## Upserts and writes
 

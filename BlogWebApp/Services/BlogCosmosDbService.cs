@@ -101,6 +101,75 @@ namespace BlogWebApp.Services
         }
 
 
+        public async Task<BlogPost?> GetBlogPostBySlugAsync(string type, string slug)
+        {
+            var query = new QueryDefinition(
+                "SELECT TOP 1 * FROM p WHERE p.type = @type AND p.slug = @slug")
+                .WithParameter("@type", type)
+                .WithParameter("@slug", slug);
+
+            var iterator = _postsContainer.GetItemQueryIterator<BlogPost>(query);
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                foreach (var item in response) return item;
+            }
+            return null;
+        }
+
+        public async Task<List<BlogPost>> GetMostRecentByTypeAsync(string type, int count)
+        {
+            var query = new QueryDefinition(
+                $"SELECT TOP {count} * FROM p WHERE p.type = @type ORDER BY p.dateCreated DESC")
+                .WithParameter("@type", type);
+
+            var results = new List<BlogPost>();
+            var iterator = _postsContainer.GetItemQueryIterator<BlogPost>(query);
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                results.AddRange(response);
+            }
+            return results;
+        }
+
+        public async Task<List<BlogPost>> GetActivityFeedAsync(int count)
+        {
+            var query = new QueryDefinition(
+                $"SELECT TOP {count} * FROM p WHERE p.type IN ('post', 'note') ORDER BY p.dateCreated DESC");
+
+            var results = new List<BlogPost>();
+            var iterator = _postsContainer.GetItemQueryIterator<BlogPost>(query);
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                results.AddRange(response);
+            }
+            return results;
+        }
+
+        public async Task<BlogPost?> GetNowAsync()
+        {
+            try
+            {
+                var response = await _postsContainer.ReadItemAsync<BlogPost>(
+                    "now-singleton", new PartitionKey("now-singleton"));
+                return response.Resource;
+            }
+            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+        }
+
+        public async Task UpsertNowAsync(BlogPost now)
+        {
+            now.PostId = "now-singleton";  // enforce the singleton id
+            now.Type = "now";
+            now.DateUpdated = DateTime.UtcNow;
+            await _postsContainer.UpsertItemAsync(now, new PartitionKey("now-singleton"));
+        }
+
 
         public async Task CreateBlogPostCommentAsync(BlogPostComment comment)
         {

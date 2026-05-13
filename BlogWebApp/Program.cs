@@ -104,7 +104,10 @@ static async Task<BlogCosmosDbService> InitializeCosmosBlogClientInstanceAsync(I
 
     await database.Database.CreateContainerIfNotExistsAsync("Posts", "/postId");
 
-    // Posts get upserted into the Feed container from the change feed.
+    // Note: as of Phase 1c, the "Feed" container is no longer the source of
+    // the public homepage activity feed (that query reads Posts directly via
+    // GetActivityFeedAsync). Feed is retained because BlogFunctionApp still
+    // projects to it and removing it would touch the change-feed Functions.
     await database.Database.CreateContainerIfNotExistsAsync("Feed", "/type");
 
     // Upsert the sprocs in the posts container.
