@@ -9,6 +9,10 @@ namespace BlogWebApp
     {
 
         public string BlogName { get; set; } = "CosmicBlog";
+        public string SiteUrl { get; set; } = "https://jeffwidmer.me";
+        public string SiteDescription { get; set; } = "The Microsoft-stack senior engineer figuring out agentic dev.";
+        public string OwnerName { get; set; } = "Jeff Widmer";
+        public string OwnerEmail { get; set; } = "jeff@townbackyard.com";
 
         public ContactSettings Contact { get; set; } = new();
 
