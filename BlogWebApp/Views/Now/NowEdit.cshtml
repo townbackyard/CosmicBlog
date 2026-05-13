@@ -1,0 +1,24 @@
+@model BlogWebApp.ViewModels.NowEditViewModel
+@{
+    ViewData["Title"] = "Edit Now page";
+}
+
+<h2>Now</h2>
+
+@if (ViewBag.Success == true)
+{
+    <div class="alert alert-success">Saved.</div>
+}
+
+<form method="post" class="col-md-10">
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="mb-3">
+        <label asp-for="Content" class="form-label">Page content</label>
+        <textarea asp-for="Content" class="form-control" rows="20"></textarea>
+        <span asp-validation-for="Content" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>
