@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using BlogWebApp.Models;
 using BlogWebApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -33,6 +34,14 @@ namespace BlogWebApp.Controllers
             m.BlogPostsMostRecent = blogPosts;
 
             return View(m);
+        }
+
+
+        [Route("posts")]
+        public async Task<IActionResult> Posts()
+        {
+            var posts = await _blogDbService.GetMostRecentByTypeAsync("post", 50);
+            return View(posts);
         }
 
 

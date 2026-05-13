@@ -21,7 +21,7 @@
 
     <div class="mt-5">
         <button class="btn btn-primary">Save</button>
-        <a href="/post/@Model.PostId" class="btn btn-light">Cancel</a>
+        <a asp-controller="BlogPost" asp-action="PostView" asp-route-slug="@Model.Slug" class="btn btn-light">Cancel</a>
     </div>
 
     @if (ViewBag.Success != null && ViewBag.Success)

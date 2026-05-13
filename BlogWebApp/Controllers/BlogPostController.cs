@@ -27,19 +27,16 @@ namespace BlogWebApp.Controllers
             _imageStorageManager = imageStorageManager;
         }
 
-        [Route("post/{postId}")]
-        public async Task<IActionResult> PostView(string postId)
+        [Route("posts/{slug}")]
+        public async Task<IActionResult> PostView(string slug)
         {
-            var bp = await _blogDbService.GetBlogPostAsync(postId);
-
-            if (bp == null)
-            {
-                return View("PostNotFound");
-            }
+            var bp = await _blogDbService.GetBlogPostBySlugAsync("post", slug);
+            if (bp == null) return View("PostNotFound");
 
             var m = new BlogPostViewViewModel
             {
                 PostId = bp.PostId,
+                Slug = bp.Slug,
                 Title = bp.Title,
                 Content = bp.Content,
                 AuthorId = bp.AuthorId,
@@ -79,7 +76,8 @@ namespace BlogWebApp.Controllers
             var m = new BlogPostEditViewModel
             {
                 Title = bp.Title,
-                Content = bp.Content
+                Content = bp.Content,
+                Slug = bp.Slug,
             };
             return View(m);
         }
@@ -90,12 +88,22 @@ namespace BlogWebApp.Controllers
         [HttpPost]
         public async Task<IActionResult> PostNew(BlogPostEditViewModel blogPostChanges)
         {
-            if (!ModelState.IsValid)
-            {
-                return View("PostEdit", blogPostChanges);
-            }
+            if (!ModelState.IsValid) return View("PostEdit", blogPostChanges);
 
             var postId = Guid.NewGuid().ToString();
+            var slug = SlugGenerator.FromTitle(blogPostChanges.Title);
+
+            // Ensure slug uniqueness — append short suffix on collision
+            if (!string.IsNullOrEmpty(slug)
+                && await _blogDbService.GetBlogPostBySlugAsync("post", slug) != null)
+            {
+                slug = $"{slug}-{postId.Substring(0, 8)}";
+            }
+
+            // If title was empty/whitespace and slug came out empty, fall back to postId for the slug
+            // so the post still has a URL. This shouldn't happen in practice (Title is required by the
+            // existing view model), but it's defensive.
+            if (string.IsNullOrEmpty(slug)) slug = postId.Substring(0, 8);
 
             // Check to see if there are any base64 images in the content and, if so,
             // upload them to Azure Blob Storage and rewrite the content to reference the blob URLs.
@@ -104,6 +112,8 @@ namespace BlogWebApp.Controllers
             var blogPost = new BlogPost
             {
                 PostId = postId,
+                Type = "post",
+                Slug = slug,
                 Title = blogPostChanges.Title,
                 Content = blogPostChanges.Content,
                 AuthorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
@@ -118,6 +128,7 @@ namespace BlogWebApp.Controllers
 
             //Show the view with a message that the blog post has been created.
             ViewBag.Success = true;
+            ViewBag.NewSlug = slug;  // surface to the view so it can link to the new post
 
             return View("PostEdit", blogPostChanges);
         }
@@ -128,24 +139,20 @@ namespace BlogWebApp.Controllers
         [HttpPost]
         public async Task<IActionResult> PostEdit(string postId, BlogPostEditViewModel blogPostChanges)
         {
-            if (!ModelState.IsValid)
-            {
-                return View(blogPostChanges);
-            }
+            if (!ModelState.IsValid) return View(blogPostChanges);
 
             var bp = await _blogDbService.GetBlogPostAsync(postId);
 
-            if (bp == null)
-            {
-                return View("PostNotFound");
-            }
+            if (bp == null) return View("PostNotFound");
 
             // Check to see if there are any base64 images in the content and, if so,
             // upload them to Azure Blob Storage and rewrite the content to reference the blob URLs.
             blogPostChanges.Content = await UploadAnyBase64Images(blogPostChanges.Content, postId);
 
+            // Do NOT reassign bp.Slug -- slugs are stable across edits (URL contracts).
             bp.Title = blogPostChanges.Title;
             bp.Content = blogPostChanges.Content;
+            bp.DateUpdated = DateTime.UtcNow;
 
             //Update the database with these changes.
             await _blogDbService.UpsertBlogPostAsync(bp);

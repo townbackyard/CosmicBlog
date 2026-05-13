@@ -6,6 +6,7 @@ namespace BlogWebApp.ViewModels
     public class BlogPostViewViewModel
     {
         public string PostId { get; set; } = string.Empty;
+        public string Slug { get; set; } = string.Empty;
 
         public string Title { get; set; } = string.Empty;
 

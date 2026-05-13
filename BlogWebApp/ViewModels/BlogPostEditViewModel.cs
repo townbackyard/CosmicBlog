@@ -10,6 +10,7 @@ namespace BlogWebApp.ViewModels
     public class BlogPostEditViewModel
     {
         public string? PostId { get; set; }
+        public string Slug { get; set; } = string.Empty;
 
 
         [Required(AllowEmptyStrings = false)]

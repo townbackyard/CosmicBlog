@@ -194,6 +194,8 @@ static async Task<(CosmosClient, BlogCosmosDbService)> InitializeCosmosBlogClien
         var helloWorldPost = new BlogPost
         {
             PostId = Guid.NewGuid().ToString(),
+            Type = "post",
+            Slug = "hello-world",
             Title = "Hello World!",
             Content = helloWorldPostHtml,
             AuthorId = Guid.NewGuid().ToString(),

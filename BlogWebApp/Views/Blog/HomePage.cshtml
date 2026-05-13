@@ -13,7 +13,7 @@
 
 @foreach (var bp in Model.BlogPostsMostRecent)
 {
-    <h3 class="mt-5"><a class="text-dark" href="/post/@bp.PostId">@bp.Title</a></h3>
+    <h3 class="mt-5"><a class="text-dark" asp-controller="BlogPost" asp-action="PostView" asp-route-slug="@bp.Slug">@bp.Title</a></h3>
     @if (User.IsInRole("Admin"))
     {
         <a href="/post/edit/@bp.PostId">edit</a>
