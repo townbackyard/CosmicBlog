@@ -1,4 +1,4 @@
-﻿@inject Microsoft.Extensions.Options.IOptions<BlogWebApp.AppSettings> AppSettings
+@inject Microsoft.Extensions.Options.IOptions<BlogWebApp.AppSettings> AppSettings
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - @AppSettings.Value.BlogName</title>
     <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css" />
+    <link rel="alternate" type="application/rss+xml" title="@AppSettings.Value.BlogName — RSS" href="/feed" />
+    <link rel="alternate" type="application/atom+xml" title="@AppSettings.Value.BlogName — Atom" href="/feed.atom" />
+    <link rel="alternate" type="application/feed+json" title="@AppSettings.Value.BlogName — JSON Feed" href="/feed.json" />
     @RenderSection("Head", required: false)
 </head>
 <body>
@@ -18,29 +21,31 @@
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="navbar-collapse collapse d-sm-inline-flex flex-sm-row-reverse">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item"><a class="nav-link text-dark" asp-controller="Blog" asp-action="Posts">Posts</a></li>
+                        <li class="nav-item"><a class="nav-link text-dark" asp-controller="Note" asp-action="Notes">Notes</a></li>
+                        <li class="nav-item"><a class="nav-link text-dark" asp-controller="Now" asp-action="Now">Now</a></li>
+                        <li class="nav-item"><a class="nav-link text-dark" asp-controller="Blog" asp-action="About">About</a></li>
+                        <li class="nav-item"><a class="nav-link text-dark" asp-controller="Contact" asp-action="Index">Contact</a></li>
+                        <li class="nav-item"><a class="nav-link text-dark" asp-controller="Newsletter" asp-action="Index">Newsletter</a></li>
+                    </ul>
                     <ul class="navbar-nav">
-                        @if (User.Identity?.IsAuthenticated == true)
+                        @if (User.Identity?.IsAuthenticated == true && User.IsInRole("Admin"))
                         {
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="BlogPost" asp-action="PostNew">+ Post</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Note" asp-action="NoteNew">+ Note</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Now" asp-action="NowEdit">Edit Now</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Account" asp-action="ChangePassword">Account</a></li>
                             <li class="nav-item">
-                                <span class="nav-link text-dark"><span class="d-sm-none d-md-inline">Signed in as </span>@User.Identity.Name</span>
-                            </li>
-                            @if (User.IsInRole("Admin"))
-                            {
-                                <li class="nav-item">
-                                    <a class="nav-link text-dark" asp-area="" asp-controller="BlogPost" asp-action="PostNew">New <span class="d-sm-none d-md-inline">Blog </span>Post</a>
-                                </li>
-                            }
-                            <li class="nav-item">
-                                <form class="form-inline" asp-controller="Account" asp-action="Logout">
+                                <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
                                     <button type="submit" class="nav-link btn btn-link text-dark">Logout</button>
                                 </form>
                             </li>
                         }
                         else
                         {
-                            <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-controller="Account" asp-action="Login">Login</a>
-                            </li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Account" asp-action="Login">Login</a></li>
                         }
                     </ul>
                 </div>
@@ -55,7 +60,11 @@
 
     <footer class="border-top footer text-muted">
         <div class="container">
-            &copy; @DateTime.Now.Year - @AppSettings.Value.BlogName - <a asp-area="" asp-controller="Blog" asp-action="Privacy">Privacy</a>
+            &copy; @DateTime.Now.Year @AppSettings.Value.OwnerName ·
+            <a asp-controller="Blog" asp-action="Privacy">Privacy</a> ·
+            <a href="/feed">RSS</a> ·
+            <a href="/feed.atom">Atom</a> ·
+            <a href="/feed.json">JSON Feed</a>
         </div>
     </footer>
     <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>

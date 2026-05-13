@@ -1,5 +1,8 @@
 @model BlogPostViewViewModel
-
+@section Head {
+    @await Html.PartialAsync("_OgTags", Model)
+    @await Html.PartialAsync("_JsonLd", Model)
+}
 
 <div>
     <h1 class="mt-5 h3">@Model.Title</h1>

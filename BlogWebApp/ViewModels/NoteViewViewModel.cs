@@ -2,7 +2,7 @@ using System;
 
 namespace BlogWebApp.ViewModels
 {
-    public class NoteViewViewModel
+    public class NoteViewViewModel : IOgContent
     {
         public string PostId { get; set; } = string.Empty;
         public string Slug { get; set; } = string.Empty;
@@ -12,5 +12,9 @@ namespace BlogWebApp.ViewModels
         public string AuthorId { get; set; } = string.Empty;
         public string AuthorUsername { get; set; } = string.Empty;
         public DateTime DateCreated { get; set; }
+
+        string IOgContent.Title => Title ?? string.Empty;  // explicit impl since the existing Title is nullable
+        public string Description => Content.StripHtml().Truncate(160);
+        public string UrlPath => $"/notes/{(string.IsNullOrEmpty(Slug) ? PostId : Slug)}";
     }
 }

@@ -1,4 +1,8 @@
 @model BlogWebApp.ViewModels.NoteViewViewModel
+@section Head {
+    @await Html.PartialAsync("_OgTags", Model)
+    @await Html.PartialAsync("_JsonLd", Model)
+}
 @{
     ViewData["Title"] = string.IsNullOrEmpty(Model.Title) ? "Note" : Model.Title;
 }

@@ -27,14 +27,12 @@ namespace BlogWebApp.Controllers
         [Route("")]
         public async Task<IActionResult> HomePage()
         {
-            var m = new BlogHomePageViewModel();
-
-            var blogPosts = await _blogDbService.GetBlogPostsMostRecentAsync(5);
-
-            m.BlogPostsMostRecent = blogPosts;
-
-            return View(m);
+            var items = await _blogDbService.GetActivityFeedAsync(20);
+            return View(items);
         }
+
+        [Route("about")]
+        public IActionResult About() => View();
 
 
         [Route("posts")]

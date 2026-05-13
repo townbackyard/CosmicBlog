@@ -3,7 +3,7 @@ using System;
 
 namespace BlogWebApp.ViewModels
 {
-    public class BlogPostViewViewModel
+    public class BlogPostViewViewModel : IOgContent
     {
         public string PostId { get; set; } = string.Empty;
         public string Slug { get; set; } = string.Empty;
@@ -16,5 +16,8 @@ namespace BlogWebApp.ViewModels
         public string AuthorUsername { get; set; } = string.Empty;
 
         public DateTime DateCreated { get; set; }
+
+        public string Description => Content.StripHtml().Truncate(160);
+        public string UrlPath => $"/posts/{Slug}";
     }
 }
