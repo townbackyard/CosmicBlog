@@ -1,21 +1,13 @@
-﻿using BlogWebApp.Models;
-using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace BlogWebApp.ViewModels
 {
     public class AccountLoginViewModel
     {
+        [Required, EmailAddress, Display(Name = "Email")]
+        public string Email { get; set; } = string.Empty;
 
-        [StringLength(60, MinimumLength = 3)]
-        [BindProperty]
-        [Required]
-        public string Username { get; set; } = string.Empty;
-
-
+        [Required, DataType(DataType.Password), Display(Name = "Password")]
+        public string Password { get; set; } = string.Empty;
     }
 }
