@@ -170,6 +170,7 @@ static async Task<(CosmosClient, BlogCosmosDbService)> InitializeCosmosBlogClien
     // GetActivityFeedAsync). Feed is retained because BlogFunctionApp still
     // projects to it and removing it would touch the change-feed Functions.
     await database.Database.CreateContainerIfNotExistsAsync("Feed", "/type");
+    await database.Database.CreateContainerIfNotExistsAsync("Subscribers", "/id");
 
     // Upsert the sprocs in the posts container.
     var postsContainer = database.Database.GetContainer("Posts");

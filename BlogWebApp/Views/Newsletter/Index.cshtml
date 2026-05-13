@@ -1,0 +1,28 @@
+@model BlogWebApp.ViewModels.NewsletterSignupViewModel
+@{
+    ViewData["Title"] = "Newsletter";
+}
+
+<h1>Newsletter</h1>
+
+<p>A newsletter is in the works. Drop your email and you'll be the first to know when it launches.</p>
+
+<form method="post" class="col-md-6">
+    @Html.AntiForgeryToken()
+
+    @* Honeypot -- visually hidden, ignored by humans, filled by bots. *@
+    <div style="position:absolute; left:-9999px;" aria-hidden="true">
+        <label>Website</label>
+        <input asp-for="Website" tabindex="-1" autocomplete="off" />
+    </div>
+
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="mb-3">
+        <label asp-for="Email" class="form-label"></label>
+        <input asp-for="Email" type="email" class="form-control" />
+        <span asp-validation-for="Email" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Sign up</button>
+</form>

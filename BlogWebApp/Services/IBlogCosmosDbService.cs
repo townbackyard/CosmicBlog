@@ -52,5 +52,8 @@ namespace BlogWebApp.Services
 
         Task<BlogUser?> GetUserAsync(string username);
 
+        Task AddSubscriberAsync(Subscriber subscriber);
+        Task<Subscriber?> GetSubscriberAsync(string emailNormalized);
+
     }
 }

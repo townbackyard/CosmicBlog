@@ -15,12 +15,14 @@ namespace BlogWebApp.Services
         private Container _usersContainer;
         private Container _postsContainer;
         private Container _feedContainer;
+        private Container _subscribersContainer;
 
         public BlogCosmosDbService(CosmosClient dbClient, string databaseName)
         {
             _usersContainer = dbClient.GetContainer(databaseName, "Users");
             _postsContainer = dbClient.GetContainer(databaseName, "Posts");
             _feedContainer = dbClient.GetContainer(databaseName, "Feed");
+            _subscribersContainer = dbClient.GetContainer(databaseName, "Subscribers");
         }
 
 
@@ -326,6 +328,26 @@ namespace BlogWebApp.Services
                 }
             }
 
+        }
+
+
+        public async Task AddSubscriberAsync(Subscriber subscriber)
+        {
+            await _subscribersContainer.UpsertItemAsync(subscriber, new PartitionKey(subscriber.Id));
+        }
+
+        public async Task<Subscriber?> GetSubscriberAsync(string emailNormalized)
+        {
+            try
+            {
+                var resp = await _subscribersContainer.ReadItemAsync<Subscriber>(
+                    emailNormalized, new PartitionKey(emailNormalized));
+                return resp.Resource;
+            }
+            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
         }
 
 
