@@ -1,6 +1,5 @@
-﻿
-using BlogWebApp.Models;
-using System.Collections.Generic;
+
+using System;
 
 namespace BlogWebApp.ViewModels
 {
@@ -12,16 +11,9 @@ namespace BlogWebApp.ViewModels
 
         public string Content { get; set; } = string.Empty;
 
-        public int CommentCount { get; set; }
-
-        public bool UserLikedPost { get; set; }
-        public int LikeCount { get; set; }
-
         public string AuthorId { get; set; } = string.Empty;
         public string AuthorUsername { get; set; } = string.Empty;
 
-
-        public List<BlogPostComment> Comments { get; set; } = new();
-
+        public DateTime DateCreated { get; set; }
     }
 }

@@ -1,19 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-using System.Diagnostics;
 using BlogWebApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using BlogWebApp.Services;
-using Microsoft.Azure.Cosmos;
-using System.Net;
 using BlogWebApp.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using System.Security.Claims;
-using System.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace BlogWebApp.Controllers
@@ -30,49 +25,6 @@ namespace BlogWebApp.Controllers
             _logger = logger;
             _appSettings = appSettings.Value ?? throw new ArgumentException(nameof(appSettings));
             _blogDbService = blogDbService;
-        }
-
-
-        [Route("Register")]
-        public async Task<IActionResult> Register()
-        {
-            var m = new AccountRegisterViewModel();
-
-            return View(m);
-        }
-
-        [Route("Register")]
-        [HttpPost]
-        public async Task<IActionResult> Register(AccountRegisterViewModel m)
-        {
-
-            if (!ModelState.IsValid)
-            {
-                return View(m);
-            }
-
-            var username = m.Username.Trim().ToLower();
-
-            var user = new BlogUser
-            {
-                UserId = Guid.NewGuid().ToString(),
-                Username = username
-            };
-
-            try
-            {
-
-                await _blogDbService.CreateUserAsync(user);
-                m.Message = $"User has been created.";
-            }
-            catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
-            {
-                //item already existed.  Optimize for the success path.
-                ModelState.AddModelError("", $"User with the username {username} already exists.");
-            }
-
-
-            return View(m);
         }
 
 

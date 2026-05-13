@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
-using System.Diagnostics;
 using BlogWebApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -40,29 +37,14 @@ namespace BlogWebApp.Controllers
                 return View("PostNotFound");
             }
 
-            var comments = await _blogDbService.GetBlogPostCommentsAsync(postId);
-
-            var userLikedPost = false;
-
-            if (User.Identity?.IsAuthenticated == true)
-            {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                    ?? throw new InvalidOperationException("Authenticated user has no NameIdentifier claim.");
-                var like = await _blogDbService.GetBlogPostLikeForUserIdAsync(postId, userId);
-                userLikedPost = like != null;
-            }
-
             var m = new BlogPostViewViewModel
             {
                 PostId = bp.PostId,
                 Title = bp.Title,
                 Content = bp.Content,
-                CommentCount = bp.CommentCount,
-                Comments = comments,
-                UserLikedPost = userLikedPost,
-                LikeCount = bp.LikeCount,
                 AuthorId = bp.AuthorId,
-                AuthorUsername = bp.AuthorUsername
+                AuthorUsername = bp.AuthorUsername,
+                DateCreated = bp.DateCreated,
             };
             return View(m);
         }
@@ -174,95 +156,6 @@ namespace BlogWebApp.Controllers
             return View(blogPostChanges);
         }
 
-
-
-        [Route("post/{postId}/comment/new")]
-        [Authorize]
-        [HttpPost]
-        public async Task<IActionResult> PostCommentNew(string postId, string comment)
-        {
-
-            if (!string.IsNullOrWhiteSpace(comment))
-            {
-                var bp = await _blogDbService.GetBlogPostAsync(postId);
-
-                if (bp != null)
-                {
-                    var blogPostComment = new BlogPostComment
-                    {
-                        CommentId = Guid.NewGuid().ToString(),
-                        PostId = postId,
-                        CommentContent = comment,
-
-                        CommentAuthorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                            ?? throw new InvalidOperationException("Authenticated user has no NameIdentifier claim."),
-                        CommentAuthorUsername = User.Identity?.Name
-                            ?? throw new InvalidOperationException("Authenticated user has no name."),
-                        CommentDateCreated = DateTime.UtcNow
-                    };
-
-                    await _blogDbService.CreateBlogPostCommentAsync(blogPostComment);
-                }
-            }
-
-            return RedirectToAction("PostView", new { postId = postId });
-        }
-
-
-        [Route("post/{postId}/like")]
-        [Authorize]
-        [HttpPost]
-        public async Task<IActionResult> PostLike(string postId)
-        {
-
-            var bp = await _blogDbService.GetBlogPostAsync(postId);
-
-            if (bp != null)
-            {
-
-                //Check that this user has not already liked this post
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                    ?? throw new InvalidOperationException("Authenticated user has no NameIdentifier claim.");
-                var like = await _blogDbService.GetBlogPostLikeForUserIdAsync(postId, userId);
-
-                if (like == null)
-                {
-                    var blogPostLike = new BlogPostLike
-                    {
-                        LikeId = Guid.NewGuid().ToString(),
-                        PostId = postId,
-
-                        LikeAuthorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                            ?? throw new InvalidOperationException("Authenticated user has no NameIdentifier claim."),
-                        LikeAuthorUsername = User.Identity?.Name
-                            ?? throw new InvalidOperationException("Authenticated user has no name."),
-                        LikeDateCreated = DateTime.UtcNow
-                    };
-
-                    await _blogDbService.CreateBlogPostLikeAsync(blogPostLike);
-                }
-            }
-
-            return RedirectToAction("PostView", new { postId = postId });
-        }
-
-        [Route("post/{postId}/unlike")]
-        [Authorize]
-        [HttpPost]
-        public async Task<IActionResult> PostUnlike(string postId)
-        {
-
-            var bp = await _blogDbService.GetBlogPostAsync(postId);
-
-            if (bp != null)
-            {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                    ?? throw new InvalidOperationException("Authenticated user has no NameIdentifier claim.");
-                await _blogDbService.DeleteBlogPostLikeAsync(postId, userId);
-            }
-
-            return RedirectToAction("PostView", new { postId = postId });
-        }
 
 
         /// <summary>
