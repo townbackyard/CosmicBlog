@@ -1,0 +1,38 @@
+@model List<BlogWebApp.Models.BlogPost>
+@{
+    ViewData["Title"] = "Notes";
+}
+
+<h1>Notes</h1>
+
+@if (!Model.Any())
+{
+    <p>No notes yet.</p>
+}
+else
+{
+    <ul class="list-unstyled">
+        @foreach (var note in Model)
+        {
+            var slugOrId = string.IsNullOrEmpty(note.Slug) ? note.PostId : note.Slug;
+            <li class="mb-4 border-bottom pb-3">
+                @if (!string.IsNullOrEmpty(note.Title))
+                {
+                    <h3 class="mb-1">
+                        <a asp-controller="Note" asp-action="NoteView" asp-route-slugOrId="@slugOrId">@note.Title</a>
+                    </h3>
+                }
+                <div>@Html.Raw(note.Content)</div>
+                @if (!string.IsNullOrEmpty(note.LinkUrl))
+                {
+                    <div><a href="@note.LinkUrl">@note.LinkUrl</a></div>
+                }
+                <small class="text-muted">
+                    <a asp-controller="Note" asp-action="NoteView" asp-route-slugOrId="@slugOrId">
+                        @note.DateCreated.ToString("MMM d, yyyy")
+                    </a>
+                </small>
+            </li>
+        }
+    </ul>
+}
