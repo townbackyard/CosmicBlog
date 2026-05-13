@@ -46,9 +46,32 @@ Patterns established during the Phase 0 modernization:
 
 ## File layout
 
-- One public type per file. Filename matches the public type name.
+- One public type per file, **except for service interfaces** — see Interface Location below.
+- Filename matches the public type name (use the implementation class name when interface and implementation share a file).
 - Namespaces match the folder tree (`Controllers/` → `BlogWebApp.Controllers`, etc.).
 - ViewModels in `BlogWebApp.ViewModels`. Models in `BlogWebApp.Models`. Services + interfaces in `BlogWebApp.Services`.
+
+## Interface Location
+
+Interfaces for services should be defined at the top of the **same file** as the implementation class, not in separate files:
+
+```csharp
+namespace BlogWebApp.Services;
+
+public interface IMyService
+{
+    Task DoWorkAsync();
+}
+
+public class MyService : IMyService
+{
+    public async Task DoWorkAsync() { /* ... */ }
+}
+```
+
+Filename is the implementation class name (`MyService.cs`), not the interface name. Rationale: keeps the contract and the implementation reviewable in one buffer; reduces file count and folder noise.
+
+**Known violations carried over from the upstream teaching example:** `IBlogCosmosDbService` / `BlogCosmosDbService`, `IImageStorageManager` / `ImageStorageManager`, `IEmailSender` / `AcsEmailSender`. Consolidate these into single files when next touching them; new services should be written following this rule from the start.
 
 ## Things to avoid
 
