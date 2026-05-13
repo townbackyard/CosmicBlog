@@ -42,11 +42,20 @@ builder.Services.AddIdentityCore<CosmicBlogUser>(options =>
     options.Password.RequireNonAlphanumeric = false;  // length over complexity
     options.User.RequireUniqueEmail = true;
 })
-// NOTE: .AddRoles<IdentityRole>() is intentionally omitted. Roles are stored as strings
-// inside CosmicBlogUser.Roles. CosmosUserStore implements IUserRoleStore<CosmicBlogUser>,
-// so UserClaimsPrincipalFactory calls GetRolesAsync and emits role claims — no separate
-// IRoleStore / RoleManager is needed, and adding .AddRoles() would break DI at startup.
+// .AddRoles<IdentityRole>() is intentionally omitted -- it would require an
+// IRoleStore<IdentityRole> registration the engine doesn't have (roles live
+// as strings inside CosmicBlogUser.Roles, not as separate role entities).
+// Instead, CosmicBlogUserClaimsPrincipalFactory (registered below) extends
+// the base UserClaimsPrincipalFactory<TUser> to emit role claims from
+// IUserRoleStore<CosmicBlogUser>.
 .AddSignInManager();
+
+// Override the default claims factory so the auth cookie carries role claims.
+builder.Services.AddScoped<IUserClaimsPrincipalFactory<CosmicBlogUser>, CosmicBlogUserClaimsPrincipalFactory>();
+
+// Store usernameNormalized / emailNormalized in lowercase (matches the
+// project's lowercase-id convention; see Subscribers partition key).
+builder.Services.AddSingleton<ILookupNormalizer, LowerInvariantLookupNormalizer>();
 
 builder.Services
     .AddAuthentication(IdentityConstants.ApplicationScheme)
@@ -84,11 +93,14 @@ using (var scope = app.Services.CreateScope())
             {
                 Email = bootstrapEmail,
                 Username = bootstrapEmail,  // Identity treats Username as the canonical login key
+                Roles = new List<string> { "Admin" },  // canonical-case; do NOT route through
+                                                       // UserManager.AddToRoleAsync (which would
+                                                       // normalize to "ADMIN" and break the cookie
+                                                       // role claim — see CosmosUserStore comments).
             };
             var createResult = await userManager.CreateAsync(user, bootstrapPassword);
             if (createResult.Succeeded)
             {
-                await userManager.AddToRoleAsync(user, "Admin");
                 app.Logger.LogWarning(
                     "Bootstrapped admin user {Email}. Rotate the bootstrap password via /admin/account.",
                     bootstrapEmail);

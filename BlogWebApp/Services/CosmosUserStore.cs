@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -125,19 +126,29 @@ namespace BlogWebApp.Services
         }
 
         // --- IUserRoleStore ---
+        // Identity calls these with normalized (UPPERCASE) role names because
+        // CosmicBlog has no IRoleStore<TRole> to track canonical-vs-normalized
+        // separation. We compare case-insensitively so a normalized lookup
+        // ("ADMIN") matches a canonical stored value ("Admin"). Storage is
+        // whatever the caller writes — the bootstrap deliberately writes the
+        // canonical case so the cookie role claim renders as "Admin" and
+        // [Authorize(Roles = "Admin")] / RequireRole("Admin") match.
 
         public Task AddToRoleAsync(CosmicBlogUser user, string roleName, CancellationToken ct)
         {
-            if (!user.Roles.Contains(roleName)) user.Roles.Add(roleName);
+            if (!user.Roles.Any(r => string.Equals(r, roleName, StringComparison.OrdinalIgnoreCase)))
+                user.Roles.Add(roleName);
             return Task.CompletedTask;
         }
         public Task RemoveFromRoleAsync(CosmicBlogUser user, string roleName, CancellationToken ct)
         {
-            user.Roles.Remove(roleName);
+            var existing = user.Roles.FirstOrDefault(r => string.Equals(r, roleName, StringComparison.OrdinalIgnoreCase));
+            if (existing != null) user.Roles.Remove(existing);
             return Task.CompletedTask;
         }
         public Task<IList<string>> GetRolesAsync(CosmicBlogUser user, CancellationToken ct) => Task.FromResult<IList<string>>(user.Roles);
-        public Task<bool> IsInRoleAsync(CosmicBlogUser user, string roleName, CancellationToken ct) => Task.FromResult(user.Roles.Contains(roleName));
+        public Task<bool> IsInRoleAsync(CosmicBlogUser user, string roleName, CancellationToken ct) =>
+            Task.FromResult(user.Roles.Any(r => string.Equals(r, roleName, StringComparison.OrdinalIgnoreCase)));
         public Task<IList<CosmicBlogUser>> GetUsersInRoleAsync(string roleName, CancellationToken ct)
         {
             // Not used in v1 admin flow; throw NotImplementedException is acceptable.
