@@ -1,0 +1,57 @@
+@model BlogWebApp.ViewModels.ContactFormViewModel
+@{
+    ViewData["Title"] = "Contact";
+}
+
+<h1>Contact</h1>
+
+@if (Model.DisplayConfirmationMessage)
+{
+    <p>Your message has been sent. I'll get back to you soon.</p>
+}
+else
+{
+    <form method="post" class="col-md-8">
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="FormLoadedAt" />
+
+        @* Honeypot -- visually hidden, ignored by humans, filled by bots. *@
+        <div style="position:absolute; left:-9999px;" aria-hidden="true">
+            <label>Website</label>
+            <input asp-for="Website" tabindex="-1" autocomplete="off" />
+        </div>
+
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+        <div class="mb-3">
+            <label asp-for="Name" class="form-label"></label>
+            <input asp-for="Name" class="form-control" />
+            <span asp-validation-for="Name" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Email" class="form-label"></label>
+            <input asp-for="Email" type="email" class="form-control" />
+            <span asp-validation-for="Email" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Phone" class="form-label"></label>
+            <input asp-for="Phone" type="tel" class="form-control" />
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Subject" class="form-label"></label>
+            <input asp-for="Subject" class="form-control" />
+            <span asp-validation-for="Subject" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="Message" class="form-label">Message <span class="text-danger">*</span></label>
+            <textarea asp-for="Message" class="form-control" rows="8"></textarea>
+            <span asp-validation-for="Message" class="text-danger"></span>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Send</button>
+    </form>
+}
