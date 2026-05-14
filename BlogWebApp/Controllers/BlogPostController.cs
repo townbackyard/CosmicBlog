@@ -86,6 +86,7 @@ namespace BlogWebApp.Controllers
         [Route("post/new")]
         [Authorize("RequireAdmin")]
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> PostNew(BlogPostEditViewModel blogPostChanges)
         {
             if (!ModelState.IsValid) return View("PostEdit", blogPostChanges);
@@ -128,7 +129,7 @@ namespace BlogWebApp.Controllers
 
             //Show the view with a message that the blog post has been created.
             ViewBag.Success = true;
-            ViewBag.NewSlug = slug;  // surface to the view so it can link to the new post
+            blogPostChanges.Slug = slug;  // populate so the Cancel/preview link in PostEdit.cshtml resolves to /posts/{slug}
 
             return View("PostEdit", blogPostChanges);
         }
@@ -137,6 +138,7 @@ namespace BlogWebApp.Controllers
         [Route("post/edit/{postId}")]
         [Authorize("RequireAdmin")]
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> PostEdit(string postId, BlogPostEditViewModel blogPostChanges)
         {
             if (!ModelState.IsValid) return View(blogPostChanges);

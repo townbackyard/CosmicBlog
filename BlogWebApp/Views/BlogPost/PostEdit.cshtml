@@ -6,6 +6,7 @@
 
 @using (Html.BeginForm())
 {
+    @Html.AntiForgeryToken()
 
     <div class="mb-3">
         <label for="title" class="h5">Title</label> <span asp-validation-for="Title" class="text-danger"></span>

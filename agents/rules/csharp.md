@@ -71,8 +71,6 @@ public class MyService : IMyService
 
 Filename is the implementation class name (`MyService.cs`), not the interface name. Rationale: keeps the contract and the implementation reviewable in one buffer; reduces file count and folder noise.
 
-**Known violations carried over from the upstream teaching example:** `IBlogCosmosDbService` / `BlogCosmosDbService`, `IImageStorageManager` / `ImageStorageManager`, `IEmailSender` / `AcsEmailSender`. Consolidate these into single files when next touching them; new services should be written following this rule from the start.
-
 ## Things to avoid
 
 - Don't add a SQL Server / EF Core / SQLite dependency without explicit scope confirmation — the engine is intentionally single-data-store (Cosmos only). ASP.NET Core Identity in Phase 1c gets a custom Cosmos-backed `IUserStore`, not EF Core.

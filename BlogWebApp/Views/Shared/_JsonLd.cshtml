@@ -1,20 +1,42 @@
 @model BlogWebApp.ViewModels.IOgContent
 @inject Microsoft.Extensions.Options.IOptions<BlogWebApp.AppSettings> AppSettings
 @{
+    // Build a POCO and serialize with System.Text.Json so the emitted JSON is
+    // valid JSON-LD. Razor string interpolation HTML-encodes (`&quot;`, `&#x27;`)
+    // which produces invalid JSON inside a <script type="application/ld+json">
+    // block.
     var siteUrl = AppSettings.Value.SiteUrl.TrimEnd('/');
     var url = $"{siteUrl}{Model.UrlPath}";
     var owner = AppSettings.Value.OwnerName;
-    var datePublished = Model.DateCreated.ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+    var jsonLd = new System.Collections.Generic.Dictionary<string, object?>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "BlogPosting",
+        ["headline"] = Model.Title,
+        ["description"] = Model.Description,
+        ["url"] = url,
+        ["author"] = new System.Collections.Generic.Dictionary<string, object?>
+        {
+            ["@type"] = "Person",
+            ["name"] = owner,
+        },
+        ["datePublished"] = Model.DateCreated.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+        ["publisher"] = new System.Collections.Generic.Dictionary<string, object?>
+        {
+            ["@type"] = "Person",
+            ["name"] = owner,
+        },
+    };
+
+    // Use the default JavaScriptEncoder (escapes `<`, `>`, `&`, etc.) so a Title
+    // containing "</script>" can't break out of the <script> block. Cosmetic cost:
+    // non-ASCII chars in titles get \uXXXX escapes -- harmless for JSON-LD parsers.
+    var json = System.Text.Json.JsonSerializer.Serialize(jsonLd, new System.Text.Json.JsonSerializerOptions
+    {
+        WriteIndented = true,
+    });
 }
 <script type="application/ld+json">
-{
-  "@@context": "https://schema.org",
-  "@@type": "BlogPosting",
-  "headline": "@Model.Title",
-  "description": "@Model.Description",
-  "url": "@url",
-  "author": { "@@type": "Person", "name": "@owner" },
-  "datePublished": "@datePublished",
-  "publisher": { "@@type": "Person", "name": "@owner" }
-}
+@Html.Raw(json)
 </script>
