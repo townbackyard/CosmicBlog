@@ -96,6 +96,60 @@ window.cosmicblog.adminEditor = {
             syncTags();  // initial render
         }
 
+        // Image paste / drop -> upload via /admin/image -> insert markdown image syntax.
+        var cm = editor.codemirror;
+
+        function uploadImage(file) {
+            var fd = new FormData();
+            fd.append('file', file);
+            if (currentPostId) fd.append('postId', currentPostId);
+            return fetch(opts.uploadEndpoint, {
+                method: 'POST',
+                credentials: 'same-origin',
+                body: fd,
+            })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); });
+        }
+
+        function insertImage(file) {
+            var altName = file.name || 'image';
+            var placeholder = '![Uploading ' + altName + '…]()';
+            var doc = cm.getDoc();
+            var cursor = doc.getCursor();
+            doc.replaceRange(placeholder, cursor);
+            uploadImage(file).then(function(resp) {
+                var contents = cm.getValue();
+                cm.setValue(contents.replace(placeholder, '![' + altName + '](' + resp.url + ')'));
+            }).catch(function(err) {
+                var contents = cm.getValue();
+                cm.setValue(contents.replace(placeholder, '![Upload failed: ' + err + '](#)'));
+            });
+        }
+
+        cm.on('paste', function(_, ev) {
+            if (!ev.clipboardData) return;
+            for (var i = 0; i < ev.clipboardData.items.length; i++) {
+                var item = ev.clipboardData.items[i];
+                if (item.kind === 'file' && item.type.indexOf('image/') === 0) {
+                    ev.preventDefault();
+                    insertImage(item.getAsFile());
+                    return;
+                }
+            }
+        });
+
+        cm.on('drop', function(_, ev) {
+            if (!ev.dataTransfer || !ev.dataTransfer.files) return;
+            for (var i = 0; i < ev.dataTransfer.files.length; i++) {
+                var file = ev.dataTransfer.files[i];
+                if (file.type.indexOf('image/') === 0) {
+                    ev.preventDefault();
+                    insertImage(file);
+                    return;
+                }
+            }
+        });
+
         this._editor = editor;
         this._opts = opts;
         this.forceSave = doAutosave;
