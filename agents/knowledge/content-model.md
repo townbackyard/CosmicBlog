@@ -21,6 +21,12 @@ public class BlogPost
     public string Slug        { get; set; } = string.Empty;
     public string? LinkUrl    { get; set; }             // notes only
     public DateTime? DateUpdated { get; set; }
+    public string Status              { get; set; } = "published";  // "draft" | "published"
+    public DateTime? PublishedAtUtc   { get; set; }                  // future = scheduled
+    public string Format              { get; set; } = "markdown";    // "markdown" | "html" (legacy)
+    public List<string> Tags          { get; set; } = new();
+    public string? Excerpt            { get; set; }
+    public string? CoverImageUrl      { get; set; }
     public string AuthorId    { get; set; }         // -> "userId" in JSON (legacy naming)
     public string AuthorUsername { get; set; }      // -> "userUsername"
     public string Title       { get; set; }
@@ -72,10 +78,7 @@ Phase 1c stores the Now page as a single Cosmos document:
 
 ## What's NOT in the content model
 
-Phase 1c does **not** add:
-- Tags (`tags[]`) — Phase 1d (couples with tag-cap UI discipline in spec §5).
-- Excerpts / cover images — Phase 1d (authoring UI).
-- Draft / scheduled status — Phase 1d. Today every doc is "published" on insert.
+Phase 1d does NOT add:
 - Post revisions / version history — out of scope.
-
-Don't add these fields opportunistically in Phase 1c. The plan keeps them deferred so the schema stabilizes incrementally.
+- Per-tag entities with description / metadata — tags are simple strings on the post.
+- Multi-language content — single-language v1.

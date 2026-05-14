@@ -210,6 +210,9 @@ static async Task<(CosmosClient, BlogCosmosDbService)> InitializeCosmosBlogClien
             PostId = Guid.NewGuid().ToString(),
             Type = "post",
             Slug = "hello-world",
+            Format = "html",            // Seed content is HTML; existing markup uses <p>/<a>.
+            Status = "published",
+            PublishedAtUtc = DateTime.UtcNow,
             Title = "Hello World!",
             Content = helloWorldPostHtml,
             AuthorId = Guid.NewGuid().ToString(),
@@ -218,6 +221,42 @@ static async Task<(CosmosClient, BlogCosmosDbService)> InitializeCosmosBlogClien
         };
 
         await postsContainer.UpsertItemAsync(helloWorldPost, new PartitionKey(helloWorldPost.PostId));
+    }
+
+    // Phase 1d migration: backfill Format / Status / PublishedAtUtc on legacy
+    // BlogPost docs that don't have those fields set. Iterates as JObject so
+    // the C# property initializer defaults (Format="markdown", Status="published")
+    // don't mask which fields were actually missing in the stored JSON. Filters
+    // by p.type so comment/like docs (which share the Posts partition) are
+    // untouched -- their absence would otherwise project into half-empty
+    // BlogPost shapes and overwrite their parent posts on upsert.
+    //
+    // Idempotent: once a doc has been backfilled, the IS_DEFINED filter
+    // excludes it from subsequent runs. A partial failure mid-loop leaves
+    // already-upserted docs migrated; a re-run picks up the rest.
+    var migrationQuery = new QueryDefinition(
+        "SELECT * FROM p WHERE p.type IN ('post', 'note', 'now') AND (NOT IS_DEFINED(p.format) OR NOT IS_DEFINED(p.status) OR NOT IS_DEFINED(p.publishedAtUtc))");
+    var migrationIter = postsContainer.GetItemQueryIterator<Newtonsoft.Json.Linq.JObject>(migrationQuery);
+    int migrated = 0;
+    while (migrationIter.HasMoreResults)
+    {
+        var resp = await migrationIter.ReadNextAsync();
+        foreach (var doc in resp)
+        {
+            // Legacy docs are all considered HTML and currently-published.
+            // PublishedAtUtc defaults to DateCreated for backward-compatible ordering.
+            if (doc["format"] == null) doc["format"] = "html";
+            if (doc["status"] == null) doc["status"] = "published";
+            if (doc["publishedAtUtc"] == null) doc["publishedAtUtc"] = doc["dateCreated"];
+            var postId = doc["postId"]?.ToString()
+                ?? throw new InvalidOperationException("Legacy Posts doc missing postId during Phase 1d migration");
+            await postsContainer.UpsertItemAsync(doc, new PartitionKey(postId));
+            migrated++;
+        }
+    }
+    if (migrated > 0)
+    {
+        Console.WriteLine($"Phase 1d migration: backfilled {migrated} legacy Posts docs with Format/Status/PublishedAtUtc.");
     }
 
     return (client, blogCosmosDbService);
