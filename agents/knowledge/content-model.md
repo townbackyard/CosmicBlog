@@ -15,9 +15,12 @@
 ```csharp
 public class BlogPost
 {
-    public string Id          { get; }              // == PostId
+    public string Id          { get; }              // == PostId (derived getter; Cosmos requires "id")
     public string PostId      { get; set; }
-    public string Type        { get; }              // hardcoded "post" — Phase 1c makes settable
+    public string Type        { get; set; } = "post";  // valid: "post" | "note" | "now"
+    public string Slug        { get; set; } = string.Empty;
+    public string? LinkUrl    { get; set; }             // notes only
+    public DateTime? DateUpdated { get; set; }
     public string AuthorId    { get; set; }         // -> "userId" in JSON (legacy naming)
     public string AuthorUsername { get; set; }      // -> "userUsername"
     public string Title       { get; set; }
@@ -29,15 +32,6 @@ public class BlogPost
 ```
 
 JSON property names use Newtonsoft `[JsonProperty(PropertyName = "...")]`. `Id` is a derived getter that returns `PostId` — Cosmos requires an `id` field; the project uses `postId` as the partition key and the derived `id` simply re-exposes it.
-
-## `BlogPost` shape — after Phase 1c (Plan 3, Task 3)
-
-```csharp
-public string Type         { get; set; } = "post";   // valid: "post" | "note" | "now"
-public string Slug         { get; set; } = string.Empty;
-public string? LinkUrl     { get; set; }             // notes only
-public DateTime? DateUpdated { get; set; }
-```
 
 `CommentCount` / `LikeCount` survive in the schema for change-feed compatibility but are not read or written from the public surface.
 

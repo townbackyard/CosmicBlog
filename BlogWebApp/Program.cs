@@ -1,9 +1,9 @@
 using System.IO;
+using System.Linq;
 using BlogWebApp;
 using BlogWebApp.Models;
 using BlogWebApp.Services;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Fluent;
 using Microsoft.Azure.Cosmos.Scripts;
@@ -13,35 +13,108 @@ var builder = WebApplication.CreateBuilder(args);
 // Bind AppSettings to root configuration (preserves prior 3.x behavior: services.Configure<AppSettings>(Configuration);)
 builder.Services.Configure<AppSettings>(builder.Configuration);
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("RequireAdmin", policy => policy.RequireRole("Admin"));
-});
-
-builder.Services
-    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
-    {
-        options.AccessDeniedPath = new PathString("/login");
-        options.LoginPath = new PathString("/login");
-    });
-
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddControllersWithViews();
+// Cosmos DB initialization — same blocking initialization as the 3.x version,
+// preserved intentionally for teaching clarity.
+var (cosmosClient, cosmosService) = await InitializeCosmosBlogClientInstanceAsync(
+    builder.Configuration.GetSection("CosmosDbBlog"));
+builder.Services.AddSingleton(cosmosClient);
+builder.Services.AddSingleton<IBlogCosmosDbService>(cosmosService);
 
 // Image storage manager — uploads embedded base64 images out of post content into Azure Blob Storage
 // (prevents Cosmos DB document bloat when authors paste screenshots into TinyMCE).
 var storageBlobConnectionString = builder.Configuration.GetValue<string>("StorageBlobConnectionString")
     ?? throw new InvalidOperationException("StorageBlobConnectionString is not configured.");
 builder.Services.AddSingleton<IImageStorageManager>(new ImageStorageManager(storageBlobConnectionString));
+builder.Services.AddSingleton<IEmailSender, AcsEmailSender>();
 
-// Cosmos DB initialization — same blocking initialization as the 3.x version,
-// preserved intentionally for teaching clarity.
-var cosmosService = await InitializeCosmosBlogClientInstanceAsync(
-    builder.Configuration.GetSection("CosmosDbBlog"));
-builder.Services.AddSingleton<IBlogCosmosDbService>(cosmosService);
+// Identity wiring — Cosmos-backed UserStore (no SQL sidecar).
+builder.Services.AddSingleton<IUserStore<CosmicBlogUser>>(sp =>
+{
+    var client = sp.GetRequiredService<CosmosClient>();
+    var dbName = builder.Configuration.GetValue<string>("CosmosDbBlog:DatabaseName")
+        ?? throw new InvalidOperationException("CosmosDbBlog:DatabaseName missing");
+    return new CosmosUserStore(client, dbName);
+});
+
+builder.Services.AddIdentityCore<CosmicBlogUser>(options =>
+{
+    options.Password.RequiredLength = 12;
+    options.Password.RequireNonAlphanumeric = false;  // length over complexity
+    options.User.RequireUniqueEmail = true;
+})
+// .AddRoles<IdentityRole>() is intentionally omitted -- it would require an
+// IRoleStore<IdentityRole> registration the engine doesn't have (roles live
+// as strings inside CosmicBlogUser.Roles, not as separate role entities).
+// Instead, CosmicBlogUserClaimsPrincipalFactory (registered below) extends
+// the base UserClaimsPrincipalFactory<TUser> to emit role claims from
+// IUserRoleStore<CosmicBlogUser>.
+.AddSignInManager();
+
+// Override the default claims factory so the auth cookie carries role claims.
+builder.Services.AddScoped<IUserClaimsPrincipalFactory<CosmicBlogUser>, CosmicBlogUserClaimsPrincipalFactory>();
+
+// Store usernameNormalized / emailNormalized in lowercase (matches the
+// project's lowercase-id convention; see Subscribers partition key).
+builder.Services.AddSingleton<ILookupNormalizer, LowerInvariantLookupNormalizer>();
+
+builder.Services
+    .AddAuthentication(IdentityConstants.ApplicationScheme)
+    .AddCookie(IdentityConstants.ApplicationScheme, options =>
+    {
+        options.LoginPath = "/login";
+        options.AccessDeniedPath = "/login";
+        options.SlidingExpiration = true;
+        options.ExpireTimeSpan = TimeSpan.FromDays(14);
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("RequireAdmin", policy => policy.RequireRole("Admin"));
+});
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
+
+// Bootstrap admin user on first run (only if no admin exists with that email).
+using (var scope = app.Services.CreateScope())
+{
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<CosmicBlogUser>>();
+    var bootstrapEmail = Environment.GetEnvironmentVariable("COSMICBLOG_BOOTSTRAP_ADMIN_EMAIL");
+    var bootstrapPassword = Environment.GetEnvironmentVariable("COSMICBLOG_BOOTSTRAP_ADMIN_PASSWORD");
+
+    if (!string.IsNullOrWhiteSpace(bootstrapEmail) && !string.IsNullOrWhiteSpace(bootstrapPassword))
+    {
+        var existing = await userManager.FindByEmailAsync(bootstrapEmail);
+        if (existing == null)
+        {
+            var user = new CosmicBlogUser
+            {
+                Email = bootstrapEmail,
+                Username = bootstrapEmail,  // Identity treats Username as the canonical login key
+                Roles = new List<string> { "Admin" },  // canonical-case; do NOT route through
+                                                       // UserManager.AddToRoleAsync (which would
+                                                       // normalize to "ADMIN" and break the cookie
+                                                       // role claim — see CosmosUserStore comments).
+            };
+            var createResult = await userManager.CreateAsync(user, bootstrapPassword);
+            if (createResult.Succeeded)
+            {
+                app.Logger.LogWarning(
+                    "Bootstrapped admin user {Email}. Rotate the bootstrap password via /admin/account.",
+                    bootstrapEmail);
+            }
+            else
+            {
+                app.Logger.LogError(
+                    "Failed to bootstrap admin {Email}: {Errors}",
+                    bootstrapEmail,
+                    string.Join("; ", createResult.Errors.Select(e => e.Description)));
+            }
+        }
+    }
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -67,7 +140,7 @@ app.Run();
 
 // --- Cosmos DB bootstrap (moved verbatim from Startup.cs) ---
 
-static async Task<BlogCosmosDbService> InitializeCosmosBlogClientInstanceAsync(IConfigurationSection configurationSection)
+static async Task<(CosmosClient, BlogCosmosDbService)> InitializeCosmosBlogClientInstanceAsync(IConfigurationSection configurationSection)
 {
     string databaseName = configurationSection.GetSection("DatabaseName").Value!;
     string account = configurationSection.GetSection("Account").Value!;
@@ -104,8 +177,12 @@ static async Task<BlogCosmosDbService> InitializeCosmosBlogClientInstanceAsync(I
 
     await database.Database.CreateContainerIfNotExistsAsync("Posts", "/postId");
 
-    // Posts get upserted into the Feed container from the change feed.
+    // Note: as of Phase 1c, the "Feed" container is no longer the source of
+    // the public homepage activity feed (that query reads Posts directly via
+    // GetActivityFeedAsync). Feed is retained because BlogFunctionApp still
+    // projects to it and removing it would touch the change-feed Functions.
     await database.Database.CreateContainerIfNotExistsAsync("Feed", "/type");
+    await database.Database.CreateContainerIfNotExistsAsync("Subscribers", "/id");
 
     // Upsert the sprocs in the posts container.
     var postsContainer = database.Database.GetContainer("Posts");
@@ -124,13 +201,15 @@ static async Task<BlogCosmosDbService> InitializeCosmosBlogClientInstanceAsync(I
         const string helloWorldPostHtml = @"
                 <p>Hi there!</p>
                 <p>Welcome to CosmicBlog — a learn-in-public blog engine on .NET 10 + Azure Cosmos DB. The Cosmos partition strategy is based on the Microsoft docs article <a target='_blank' href='https://docs.microsoft.com/en-us/azure/cosmos-db/how-to-model-partition-example'>How to model and partition data on Azure Cosmos DB using a real-world example</a>.</p>
-                <p>To login as the Blog Administrator, register and login as the username <b>jsmith</b>. The Admin username can be changed in the BlogWebApp appsettings.json file.</p>
+                <p>To login as the Blog Administrator, set COSMICBLOG_BOOTSTRAP_ADMIN_EMAIL and COSMICBLOG_BOOTSTRAP_ADMIN_PASSWORD environment variables on first run to bootstrap the admin account.</p>
                 <p>Please post any issues that you have with this code to the repository at <a target='_blank' href='https://github.com/townbackyard/CosmicBlog/issues'>https://github.com/townbackyard/CosmicBlog/issues</a></p>
         ";
 
         var helloWorldPost = new BlogPost
         {
             PostId = Guid.NewGuid().ToString(),
+            Type = "post",
+            Slug = "hello-world",
             Title = "Hello World!",
             Content = helloWorldPostHtml,
             AuthorId = Guid.NewGuid().ToString(),
@@ -141,7 +220,7 @@ static async Task<BlogCosmosDbService> InitializeCosmosBlogClientInstanceAsync(I
         await postsContainer.UpsertItemAsync(helloWorldPost, new PartitionKey(helloWorldPost.PostId));
     }
 
-    return blogCosmosDbService;
+    return (client, blogCosmosDbService);
 }
 
 static async Task UpsertStoredProcedureAsync(Container container, string scriptFileName)

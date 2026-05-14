@@ -1,0 +1,34 @@
+@inject Microsoft.Extensions.Options.IOptions<BlogWebApp.AppSettings> AppSettings
+@{
+    ViewData["Title"] = "About";
+}
+
+<h1>About</h1>
+
+<p>
+    I'm <strong>@AppSettings.Value.OwnerName</strong>. I run
+    <a href="https://townbackyard.com">TownBackyard Software</a>, a Microsoft-stack
+    consulting practice. I've been shipping .NET / Azure / Cosmos DB / ASP.NET work
+    for 25+ years and I'm currently leaning into helping engineering teams adopt
+    agentic-development tools (Claude Code, Copilot, MCP, Azure AI Foundry) in
+    real codebases — usually .NET ones with constraints that JS/Python-flavored
+    AI-dev advice doesn't account for.
+</p>
+
+<p>
+    This site is the learn-in-public side of that work — evidence over framework,
+    deliberately unpolished.
+</p>
+
+<p class="text-muted">
+    <small>
+        Disambiguation: I'm <em>the engineer</em> Jeff Widmer. There's also an
+        <em>author</em> Jeff Widmer who lives nearby and owns
+        <code>jeffwidmer.com</code>. Different person.
+    </small>
+</p>
+
+<p>
+    Looking for consulting?
+    <a href="https://townbackyard.com/contact">Reach out via TownBackyard</a>.
+</p>

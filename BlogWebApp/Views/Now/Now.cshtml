@@ -1,0 +1,21 @@
+@model BlogWebApp.Models.BlogPost?
+@{
+    ViewData["Title"] = "Now";
+}
+
+<h1>Now</h1>
+
+@if (Model == null)
+{
+    <p>Nothing here yet.</p>
+}
+else
+{
+    <article>
+        <div>@Html.Raw(Model.Content)</div>
+        @if (Model.DateUpdated.HasValue)
+        {
+            <p class="text-muted small mt-3">Last updated @Model.DateUpdated.Value.ToString("MMMM d, yyyy")</p>
+        }
+    </article>
+}

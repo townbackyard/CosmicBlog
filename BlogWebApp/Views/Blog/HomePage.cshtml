@@ -1,27 +1,52 @@
-﻿@model BlogHomePageViewModel
+@model List<BlogWebApp.Models.BlogPost>
 @inject Microsoft.Extensions.Options.IOptions<BlogWebApp.AppSettings> AppSettings
-
-
-<h1>@AppSettings.Value.BlogName</h1>
-
-
-@if (!Model.BlogPostsMostRecent.Any())
-{
-    <div class="alert alert-info">There are no posts in this blog.</div>
+@{
+    ViewData["Title"] = "Home";
 }
 
+<header class="mb-4">
+    <h1>@AppSettings.Value.BlogName</h1>
+    <p class="lead">@AppSettings.Value.SiteDescription</p>
+</header>
 
-@foreach (var bp in Model.BlogPostsMostRecent)
-{
-    <h3 class="mt-5"><a class="text-dark" href="/post/@bp.PostId">@bp.Title</a></h3>
-    <a href="/post/@bp.PostId#comments" class="badge rounded-pill text-bg-secondary text-decoration-none">@bp.CommentCount Comment@(bp.CommentCount == 1 ? "" : "s")</a>
-    <a href="/post/@bp.PostId" class="badge rounded-pill text-bg-secondary text-decoration-none">@bp.LikeCount Like@(bp.LikeCount == 1 ? "" : "s")</a>
-    @if (User.IsInRole("Admin"))
+<section>
+    <h2 class="visually-hidden">Activity</h2>
+    @if (!Model.Any())
     {
-        <a href="/post/edit/@bp.PostId">edit</a>
+        <p>Nothing here yet.</p>
     }
-    <p>Written by: <a href="/user/@bp.AuthorId/posts">@bp.AuthorUsername</a></p>
-    <p>
-        @Html.Raw(bp.Content)
-    </p>
-}
+    else
+    {
+        <ul class="list-unstyled">
+            @foreach (var item in Model)
+            {
+                var slugOrId = string.IsNullOrEmpty(item.Slug) ? item.PostId : item.Slug;
+                var itemUrl = item.Type == "post"
+                    ? Url.Action("PostView", "BlogPost", new { slug = item.Slug })
+                    : Url.Action("NoteView", "Note", new { slugOrId = slugOrId });
+
+                <li class="mb-4 pb-3 border-bottom">
+                    <div class="small text-uppercase text-muted mb-1">
+                        @item.Type · @item.DateCreated.ToString("MMM d, yyyy")
+                    </div>
+                    @if (!string.IsNullOrEmpty(item.Title))
+                    {
+                        <h3 class="mb-1"><a href="@itemUrl">@item.Title</a></h3>
+                    }
+                    @if (item.Type == "note")
+                    {
+                        <div>@Html.Raw(item.Content)</div>
+                        @if (!string.IsNullOrEmpty(item.LinkUrl))
+                        {
+                            <div class="small"><a href="@item.LinkUrl">@item.LinkUrl</a></div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="mb-0"><a href="@itemUrl">Read post →</a></p>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>

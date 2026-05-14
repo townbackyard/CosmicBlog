@@ -1,4 +1,4 @@
-﻿using BlogWebApp.Models;
+using BlogWebApp.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Azure.Cosmos;
 using Newtonsoft.Json;
@@ -9,18 +9,71 @@ using System.Threading.Tasks;
 
 namespace BlogWebApp.Services
 {
+    public interface IBlogCosmosDbService
+    {
+
+        Task<List<BlogPost>> GetBlogPostsMostRecentAsync(int numberOfPosts);
+        Task<List<BlogPost>> GetBlogPostsForUserId(string userId);
+
+        Task<BlogPost?> GetBlogPostAsync(string postId);
+        Task UpsertBlogPostAsync(BlogPost post);
+
+        // Slug-based lookup (single post or note)
+        Task<BlogPost?> GetBlogPostBySlugAsync(string type, string slug);
+
+        // Type-filtered most-recent query (used by /posts, /notes pages)
+        Task<List<BlogPost>> GetMostRecentByTypeAsync(string type, int count);
+
+        // Unified activity-feed query (posts + notes interleaved by dateCreated DESC).
+        // Excludes "now" — the Now page is read by id, not as feed content.
+        Task<List<BlogPost>> GetActivityFeedAsync(int count);
+
+        // Now singleton — there is exactly one document with id = "now-singleton"
+        Task<BlogPost?> GetNowAsync();
+
+        /// <summary>
+        /// Upsert the Now page singleton. The implementation overwrites
+        /// <c>PostId</c>, <c>Type</c>, and <c>DateUpdated</c> on the supplied
+        /// object before writing (the caller's instance is mutated in place).
+        /// <para>On first creation, the caller must set <c>DateCreated</c> —
+        /// this method does not initialize it.</para>
+        /// </summary>
+        Task UpsertNowAsync(BlogPost now);
+
+        Task CreateBlogPostCommentAsync(BlogPostComment comment);
+        Task<List<BlogPostComment>> GetBlogPostCommentsAsync(string postId);
+
+
+        Task CreateBlogPostLikeAsync(BlogPostLike like);
+        Task DeleteBlogPostLikeAsync(string postId, string userId);
+        Task<List<BlogPostLike>> GetBlogPostLikesAsync(string postId);
+        Task<BlogPostLike?> GetBlogPostLikeForUserIdAsync(string postId, string userId);
+
+
+        Task CreateUserAsync(BlogUser user);
+        Task UpdateUsernameAsync(BlogUser userWithUpdatedUsername, string oldUsername);
+
+        Task<BlogUser?> GetUserAsync(string username);
+
+        Task AddSubscriberAsync(Subscriber subscriber);
+        Task<Subscriber?> GetSubscriberAsync(string emailNormalized);
+
+    }
+
     public class BlogCosmosDbService : IBlogCosmosDbService
     {
 
         private Container _usersContainer;
         private Container _postsContainer;
         private Container _feedContainer;
+        private Container _subscribersContainer;
 
         public BlogCosmosDbService(CosmosClient dbClient, string databaseName)
         {
             _usersContainer = dbClient.GetContainer(databaseName, "Users");
             _postsContainer = dbClient.GetContainer(databaseName, "Posts");
             _feedContainer = dbClient.GetContainer(databaseName, "Feed");
+            _subscribersContainer = dbClient.GetContainer(databaseName, "Subscribers");
         }
 
 
@@ -100,6 +153,75 @@ namespace BlogWebApp.Services
             await this._postsContainer.UpsertItemAsync<BlogPost>(post, new PartitionKey(post.PostId));
         }
 
+
+        public async Task<BlogPost?> GetBlogPostBySlugAsync(string type, string slug)
+        {
+            var query = new QueryDefinition(
+                "SELECT TOP 1 * FROM p WHERE p.type = @type AND p.slug = @slug")
+                .WithParameter("@type", type)
+                .WithParameter("@slug", slug);
+
+            var iterator = _postsContainer.GetItemQueryIterator<BlogPost>(query);
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                foreach (var item in response) return item;
+            }
+            return null;
+        }
+
+        public async Task<List<BlogPost>> GetMostRecentByTypeAsync(string type, int count)
+        {
+            var query = new QueryDefinition(
+                $"SELECT TOP {count} * FROM p WHERE p.type = @type ORDER BY p.dateCreated DESC")
+                .WithParameter("@type", type);
+
+            var results = new List<BlogPost>();
+            var iterator = _postsContainer.GetItemQueryIterator<BlogPost>(query);
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                results.AddRange(response);
+            }
+            return results;
+        }
+
+        public async Task<List<BlogPost>> GetActivityFeedAsync(int count)
+        {
+            var query = new QueryDefinition(
+                $"SELECT TOP {count} * FROM p WHERE p.type IN ('post', 'note') ORDER BY p.dateCreated DESC");
+
+            var results = new List<BlogPost>();
+            var iterator = _postsContainer.GetItemQueryIterator<BlogPost>(query);
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                results.AddRange(response);
+            }
+            return results;
+        }
+
+        public async Task<BlogPost?> GetNowAsync()
+        {
+            try
+            {
+                var response = await _postsContainer.ReadItemAsync<BlogPost>(
+                    "now-singleton", new PartitionKey("now-singleton"));
+                return response.Resource;
+            }
+            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+        }
+
+        public async Task UpsertNowAsync(BlogPost now)
+        {
+            now.PostId = "now-singleton";  // enforce the singleton id
+            now.Type = "now";
+            now.DateUpdated = DateTime.UtcNow;
+            await _postsContainer.UpsertItemAsync(now, new PartitionKey("now-singleton"));
+        }
 
 
         public async Task CreateBlogPostCommentAsync(BlogPostComment comment)
@@ -257,6 +379,26 @@ namespace BlogWebApp.Services
                 }
             }
 
+        }
+
+
+        public async Task AddSubscriberAsync(Subscriber subscriber)
+        {
+            await _subscribersContainer.UpsertItemAsync(subscriber, new PartitionKey(subscriber.Id));
+        }
+
+        public async Task<Subscriber?> GetSubscriberAsync(string emailNormalized)
+        {
+            try
+            {
+                var resp = await _subscribersContainer.ReadItemAsync<Subscriber>(
+                    emailNormalized, new PartitionKey(emailNormalized));
+                return resp.Resource;
+            }
+            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
         }
 
 
