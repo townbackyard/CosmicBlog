@@ -80,7 +80,7 @@ namespace BlogWebApp.Controllers
                 Slug = slug,
                 Title = m.Title ?? string.Empty,
                 Content = m.Content,
-                LinkUrl = string.IsNullOrWhiteSpace(m.LinkUrl) ? null : m.LinkUrl,
+                LinkUrl = SanitizeLinkUrl(m.LinkUrl),
                 AuthorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                     ?? throw new InvalidOperationException("Authenticated user has no NameIdentifier claim."),
                 AuthorUsername = User.Identity?.Name
@@ -122,12 +122,25 @@ namespace BlogWebApp.Controllers
             // Preserve slug across edits (URL contract).
             note.Title = m.Title ?? string.Empty;
             note.Content = m.Content;
-            note.LinkUrl = string.IsNullOrWhiteSpace(m.LinkUrl) ? null : m.LinkUrl;
+            note.LinkUrl = SanitizeLinkUrl(m.LinkUrl);
             note.DateUpdated = DateTime.UtcNow;
 
             await _blogDbService.UpsertBlogPostAsync(note);
             ViewBag.Success = true;
             return View(m);
+        }
+
+        /// <summary>
+        /// Returns the input URL if it's an absolute http/https/mailto URL,
+        /// or null otherwise. The DataAnnotations <c>[Url]</c> attribute
+        /// permits non-HTTP schemes (e.g. <c>javascript:alert(1)</c>) which
+        /// would later render as an XSS payload inside a rendered link.
+        /// </summary>
+        private static string? SanitizeLinkUrl(string? linkUrl)
+        {
+            if (string.IsNullOrWhiteSpace(linkUrl)) return null;
+            if (!Uri.TryCreate(linkUrl.Trim(), UriKind.Absolute, out var uri)) return null;
+            return uri.Scheme is "http" or "https" or "mailto" ? uri.ToString() : null;
         }
     }
 }
