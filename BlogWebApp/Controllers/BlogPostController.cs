@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using BlogWebApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
@@ -80,6 +81,11 @@ namespace BlogWebApp.Controllers
                 Title = bp.Title,
                 Content = bp.Content,
                 Slug = bp.Slug,
+                Status = bp.Status,
+                PublishedAtUtc = bp.PublishedAtUtc,
+                Tags = bp.Tags,
+                Excerpt = bp.Excerpt,
+                CoverImageUrl = bp.CoverImageUrl,
             };
             return View(m);
         }
@@ -108,16 +114,30 @@ namespace BlogWebApp.Controllers
             // existing view model), but it's defensive.
             if (string.IsNullOrEmpty(slug)) slug = postId.Substring(0, 8);
 
+            // The hidden field arrives as a single comma-separated string; split on commas,
+            // trim, drop empties, enforce 12-cap server-side. (Task 11 hardens this with a
+            // 12-cap model error.)
+            var tags = (Request.Form["Tags"].ToString() ?? "")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .Where(t => !string.IsNullOrEmpty(t))
+                .Take(12)
+                .ToList();
+
             var blogPost = new BlogPost
             {
                 PostId = postId,
                 Type = "post",
                 Slug = slug,
                 Format = "markdown",
-                Status = "published",                  // Task 7 adds draft/schedule UI
-                PublishedAtUtc = DateTime.UtcNow,      // immediate publish for now
+                Status = blogPostChanges.Status,
+                PublishedAtUtc = blogPostChanges.PublishedAtUtc
+                                 ?? (blogPostChanges.Status == "published" ? DateTime.UtcNow : (DateTime?)null),
                 Title = blogPostChanges.Title,
                 Content = blogPostChanges.Content,
+                Excerpt = blogPostChanges.Excerpt,
+                CoverImageUrl = blogPostChanges.CoverImageUrl,
+                Tags = tags,
                 AuthorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                     ?? throw new InvalidOperationException("Authenticated user has no NameIdentifier claim."),
                 AuthorUsername = User.Identity?.Name
@@ -148,9 +168,22 @@ namespace BlogWebApp.Controllers
 
             if (bp == null) return View("PostNotFound");
 
+            var tags = (Request.Form["Tags"].ToString() ?? "")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .Where(t => !string.IsNullOrEmpty(t))
+                .Take(12)
+                .ToList();
+
             // Do NOT reassign bp.Slug -- slugs are stable across edits (URL contracts).
             bp.Title = blogPostChanges.Title;
             bp.Content = blogPostChanges.Content;
+            bp.Excerpt = blogPostChanges.Excerpt;
+            bp.CoverImageUrl = blogPostChanges.CoverImageUrl;
+            bp.Tags = tags;
+            bp.Status = blogPostChanges.Status;
+            bp.PublishedAtUtc = blogPostChanges.PublishedAtUtc
+                                ?? (bp.Status == "published" && !bp.PublishedAtUtc.HasValue ? DateTime.UtcNow : bp.PublishedAtUtc);
             bp.DateUpdated = DateTime.UtcNow;
 
             //Update the database with these changes.

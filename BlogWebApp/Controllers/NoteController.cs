@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using BlogWebApp.Models;
 using BlogWebApp.Services;
@@ -80,14 +81,26 @@ namespace BlogWebApp.Controllers
                 slug = $"{slug}-{postId.Substring(0, 8)}";
             }
 
+            var tags = (Request.Form["Tags"].ToString() ?? "")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .Where(t => !string.IsNullOrEmpty(t))
+                .Take(12)
+                .ToList();
+
             var note = new BlogPost
             {
                 PostId = postId,
                 Type = "note",
                 Slug = slug,
+                Format = "markdown",
+                Status = m.Status,
+                PublishedAtUtc = m.PublishedAtUtc
+                                 ?? (m.Status == "published" ? DateTime.UtcNow : (DateTime?)null),
                 Title = m.Title ?? string.Empty,
                 Content = m.Content,
                 LinkUrl = SanitizeLinkUrl(m.LinkUrl),
+                Tags = tags,
                 AuthorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                     ?? throw new InvalidOperationException("Authenticated user has no NameIdentifier claim."),
                 AuthorUsername = User.Identity?.Name
@@ -112,6 +125,9 @@ namespace BlogWebApp.Controllers
                 Title = note.Title,
                 Content = note.Content,
                 LinkUrl = note.LinkUrl,
+                Status = note.Status,
+                PublishedAtUtc = note.PublishedAtUtc,
+                Tags = note.Tags,
             });
         }
 
@@ -126,10 +142,21 @@ namespace BlogWebApp.Controllers
             var note = await _blogDbService.GetBlogPostAsync(postId);
             if (note == null || note.Type != "note") return View("NoteNotFound");
 
+            var tags = (Request.Form["Tags"].ToString() ?? "")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .Where(t => !string.IsNullOrEmpty(t))
+                .Take(12)
+                .ToList();
+
             // Preserve slug across edits (URL contract).
             note.Title = m.Title ?? string.Empty;
             note.Content = m.Content;
             note.LinkUrl = SanitizeLinkUrl(m.LinkUrl);
+            note.Tags = tags;
+            note.Status = m.Status;
+            note.PublishedAtUtc = m.PublishedAtUtc
+                                  ?? (note.Status == "published" && !note.PublishedAtUtc.HasValue ? DateTime.UtcNow : note.PublishedAtUtc);
             note.DateUpdated = DateTime.UtcNow;
 
             await _blogDbService.UpsertBlogPostAsync(note);

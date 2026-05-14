@@ -11,6 +11,24 @@ window.cosmicblog.adminEditor = {
             status: ['lines', 'words'],
             renderingConfig: { singleLineBreaks: false },
         });
+        // Tags: parse comma-separated input, enforce 12-cap, mirror to hidden field.
+        var tagsInput = document.getElementById('tags-input');
+        var tagsHidden = document.getElementById('tags-hidden');
+        var tagsCount = document.getElementById('tags-count');
+        if (tagsInput && tagsHidden && tagsCount) {
+            var syncTags = function() {
+                var raw = tagsInput.value || '';
+                var tags = raw.split(',').map(function(t) { return t.trim(); }).filter(Boolean);
+                if (tags.length > 12) {
+                    tags = tags.slice(0, 12);
+                    tagsInput.value = tags.join(', ');
+                }
+                tagsCount.textContent = tags.length + ' / 12 tags';
+                tagsHidden.value = tags.join(',');
+            };
+            tagsInput.addEventListener('input', syncTags);
+            syncTags();  // initial render
+        }
         this._editor = editor;
         this._opts = opts;
     },

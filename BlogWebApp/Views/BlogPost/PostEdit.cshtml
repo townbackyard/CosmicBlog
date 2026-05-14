@@ -19,6 +19,37 @@
         <small id="contentHelp" class="form-text text-muted">Content of the blog post.</small>
     </div>
 
+    <div class="row mt-4">
+        <div class="col-md-6 mb-3">
+            <label asp-for="Excerpt" class="form-label">Excerpt (optional, for feeds/SEO)</label>
+            <textarea asp-for="Excerpt" class="form-control" rows="2" maxlength="280"></textarea>
+        </div>
+        <div class="col-md-6 mb-3">
+            <label asp-for="CoverImageUrl" class="form-label">Cover image URL (optional)</label>
+            <input asp-for="CoverImageUrl" class="form-control" type="url" />
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Tags" class="form-label">Tags (comma-separated, max 12)</label>
+        <input id="tags-input" class="form-control" value="@string.Join(", ", Model.Tags)" />
+        <input type="hidden" name="Tags" id="tags-hidden" />
+        <small class="form-text text-muted" id="tags-count">0 / 12 tags</small>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label">Status</label>
+            <select asp-for="Status" class="form-select">
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="PublishedAtUtc" class="form-label">Publish at (UTC; leave blank for "now")</label>
+            <input asp-for="PublishedAtUtc" type="datetime-local" class="form-control" />
+        </div>
+    </div>
 
     <div class="mt-5">
         <button class="btn btn-primary">Save</button>
