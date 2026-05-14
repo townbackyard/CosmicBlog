@@ -35,6 +35,12 @@ namespace BlogWebApp.Controllers
             {
                 note = await _blogDbService.GetBlogPostAsync(slugOrId);
                 if (note == null || note.Type != "note") return View("NoteNotFound");
+
+                // Public surface — hide drafts and future-scheduled. (GetBlogPostAsync is a
+                // point-read that doesn't apply the public status/date filter; admin pages
+                // rely on that, so we add the filter here on the public path.)
+                if (note.Status != "published" || (note.PublishedAtUtc.HasValue && note.PublishedAtUtc.Value > DateTime.UtcNow))
+                    return View("NoteNotFound");
             }
 
             return View(new NoteViewViewModel
