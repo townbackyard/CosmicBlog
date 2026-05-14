@@ -49,6 +49,7 @@ namespace BlogWebApp.Controllers
                 Slug = note.Slug,
                 Title = note.Title,
                 Content = note.Content,
+                Format = note.Format,
                 LinkUrl = note.LinkUrl,
                 AuthorId = note.AuthorId,
                 AuthorUsername = note.AuthorUsername,

@@ -41,6 +41,13 @@ JSON property names use Newtonsoft `[JsonProperty(PropertyName = "...")]`. `Id` 
 
 `CommentCount` / `LikeCount` survive in the schema for change-feed compatibility but are not read or written from the public surface.
 
+## Markdown rendering
+
+Content is stored as either markdown source (`Format = "markdown"`) or rendered
+HTML (`Format = "html"`, for pre-Phase-1d content). `IMarkdownRenderer.Render(content, format)`
+dispatches: markdown → Markdig (with advanced extensions); html → emitted as-is.
+Views inject `IMarkdownRenderer` and call `Render` instead of `@Html.Raw`.
+
 ## Content types and URL conventions (post-Phase-1c)
 
 | `Type` | Public URL | Admin URL | Notes |

@@ -1,4 +1,5 @@
 @model BlogWebApp.Models.BlogPost?
+@inject BlogWebApp.Services.IMarkdownRenderer Markdown
 @{
     ViewData["Title"] = "Now";
 }
@@ -12,7 +13,7 @@
 else
 {
     <article>
-        <div>@Html.Raw(Model.Content)</div>
+        <div>@Markdown.Render(Model.Content, Model.Format)</div>
         @if (Model.DateUpdated.HasValue)
         {
             <p class="text-muted small mt-3">Last updated @Model.DateUpdated.Value.ToString("MMMM d, yyyy")</p>

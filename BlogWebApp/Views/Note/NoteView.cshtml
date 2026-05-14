@@ -1,4 +1,5 @@
 @model BlogWebApp.ViewModels.NoteViewViewModel
+@inject BlogWebApp.Services.IMarkdownRenderer Markdown
 @section Head {
     @await Html.PartialAsync("_OgTags", Model)
     @await Html.PartialAsync("_JsonLd", Model)
@@ -13,7 +14,7 @@
         <h1>@Model.Title</h1>
     }
     <div class="text-muted mb-3">@Model.DateCreated.ToString("MMMM d, yyyy")</div>
-    <div>@Html.Raw(Model.Content)</div>
+    <div>@Markdown.Render(Model.Content, Model.Format)</div>
     @if (!string.IsNullOrEmpty(Model.LinkUrl))
     {
         <p class="mt-3"><a href="@Model.LinkUrl">@Model.LinkUrl</a></p>

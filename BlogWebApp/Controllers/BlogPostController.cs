@@ -39,6 +39,7 @@ namespace BlogWebApp.Controllers
                 Slug = bp.Slug,
                 Title = bp.Title,
                 Content = bp.Content,
+                Format = bp.Format,
                 AuthorId = bp.AuthorId,
                 AuthorUsername = bp.AuthorUsername,
                 DateCreated = bp.DateCreated,

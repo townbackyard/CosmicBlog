@@ -1,4 +1,5 @@
 @model List<BlogWebApp.Models.BlogPost>
+@inject BlogWebApp.Services.IMarkdownRenderer Markdown
 @{
     ViewData["Title"] = "Notes";
 }
@@ -22,7 +23,7 @@ else
                         <a asp-controller="Note" asp-action="NoteView" asp-route-slugOrId="@slugOrId">@note.Title</a>
                     </h3>
                 }
-                <div>@Html.Raw(note.Content)</div>
+                <div>@Markdown.Render(note.Content, note.Format)</div>
                 @if (!string.IsNullOrEmpty(note.LinkUrl))
                 {
                     <div><a href="@note.LinkUrl">@note.LinkUrl</a></div>

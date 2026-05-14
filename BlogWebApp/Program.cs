@@ -26,6 +26,7 @@ var storageBlobConnectionString = builder.Configuration.GetValue<string>("Storag
     ?? throw new InvalidOperationException("StorageBlobConnectionString is not configured.");
 builder.Services.AddSingleton<IImageStorageManager>(new ImageStorageManager(storageBlobConnectionString));
 builder.Services.AddSingleton<IEmailSender, AcsEmailSender>();
+builder.Services.AddSingleton<IMarkdownRenderer, MarkdownRenderer>();
 
 // Identity wiring — Cosmos-backed UserStore (no SQL sidecar).
 builder.Services.AddSingleton<IUserStore<CosmicBlogUser>>(sp =>

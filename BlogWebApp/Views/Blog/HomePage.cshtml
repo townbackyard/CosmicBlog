@@ -1,5 +1,6 @@
 @model List<BlogWebApp.Models.BlogPost>
 @inject Microsoft.Extensions.Options.IOptions<BlogWebApp.AppSettings> AppSettings
+@inject BlogWebApp.Services.IMarkdownRenderer Markdown
 @{
     ViewData["Title"] = "Home";
 }
@@ -35,7 +36,7 @@
                     }
                     @if (item.Type == "note")
                     {
-                        <div>@Html.Raw(item.Content)</div>
+                        <div>@Markdown.Render(item.Content, item.Format)</div>
                         @if (!string.IsNullOrEmpty(item.LinkUrl))
                         {
                             <div class="small"><a href="@item.LinkUrl">@item.LinkUrl</a></div>
