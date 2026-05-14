@@ -26,7 +26,7 @@
 
     <div class="mb-3">
         <label asp-for="Content" class="form-label"></label>
-        <textarea asp-for="Content" class="form-control" rows="10"></textarea>
+        <textarea asp-for="Content" id="content" class="form-control" rows="10"></textarea>
         <span asp-validation-for="Content" class="text-danger"></span>
     </div>
 
@@ -53,3 +53,17 @@
 
     <button type="submit" class="btn btn-primary">Save</button>
 </form>
+
+@section Scripts{
+    <script src="~/lib/easymde/dist/easymde.min.js"></script>
+    <script src="~/js/admin-editor.js"></script>
+    <script>
+        cosmicblog.adminEditor.init({
+            textareaSelector: '#content',
+            postId: '@(Model.PostId ?? "")',
+            postType: 'note',
+            uploadEndpoint: '/admin/image',
+            autosaveEndpoint: '/admin/draft/save'
+        });
+    </script>
+}

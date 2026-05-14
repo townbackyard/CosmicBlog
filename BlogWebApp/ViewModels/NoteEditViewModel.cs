@@ -6,6 +6,8 @@ namespace BlogWebApp.ViewModels
 {
     public class NoteEditViewModel
     {
+        public string? PostId { get; set; }
+
         [Display(Name = "Title (optional)")]
         public string? Title { get; set; }
 

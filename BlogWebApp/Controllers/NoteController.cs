@@ -122,6 +122,7 @@ namespace BlogWebApp.Controllers
 
             return View(new NoteEditViewModel
             {
+                PostId = note.PostId,
                 Title = note.Title,
                 Content = note.Content,
                 LinkUrl = note.LinkUrl,
