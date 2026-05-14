@@ -37,20 +37,15 @@
 }
 
 @section Scripts{
-    <script src="~/lib/tinymce/tinymce.min.js"></script>
-    <script type="text/javascript">
-        tinymce.init({
-            selector: '#content',
-            license_key: 'gpl',
-            promotion: false,
-            // Allow pasting images from the clipboard (e.g. screenshots). TinyMCE 7 inlines
-            // them as base64 <img src="data:image/...;base64,..."> in the editor content.
-            // The server-side BlogPostController.UploadAnyBase64Images() then extracts each
-            // base64 payload on save, uploads it to Azure Blob Storage, and rewrites the
-            // <img> src to /img/post/{postId}/{guid}.png so the post body stays small.
-            paste_data_images: true,
-            // Disable TinyMCE's own automatic upload pipeline — we handle it server-side.
-            automatic_uploads: false
+    <script src="~/lib/easymde/dist/easymde.min.js"></script>
+    <script src="~/js/admin-editor.js"></script>
+    <script>
+        cosmicblog.adminEditor.init({
+            textareaSelector: '#content',
+            postId: '@(Model.PostId ?? "")',
+            postType: 'post',
+            uploadEndpoint: '/admin/image',
+            autosaveEndpoint: '/admin/draft/save'
         });
     </script>
 }

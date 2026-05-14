@@ -76,6 +76,7 @@ namespace BlogWebApp.Controllers
 
             var m = new BlogPostEditViewModel
             {
+                PostId = bp.PostId,
                 Title = bp.Title,
                 Content = bp.Content,
                 Slug = bp.Slug,
@@ -107,15 +108,14 @@ namespace BlogWebApp.Controllers
             // existing view model), but it's defensive.
             if (string.IsNullOrEmpty(slug)) slug = postId.Substring(0, 8);
 
-            // Check to see if there are any base64 images in the content and, if so,
-            // upload them to Azure Blob Storage and rewrite the content to reference the blob URLs.
-            blogPostChanges.Content = await UploadAnyBase64Images(blogPostChanges.Content, postId);
-
             var blogPost = new BlogPost
             {
                 PostId = postId,
                 Type = "post",
                 Slug = slug,
+                Format = "markdown",
+                Status = "published",                  // Task 7 adds draft/schedule UI
+                PublishedAtUtc = DateTime.UtcNow,      // immediate publish for now
                 Title = blogPostChanges.Title,
                 Content = blogPostChanges.Content,
                 AuthorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
@@ -147,10 +147,6 @@ namespace BlogWebApp.Controllers
             var bp = await _blogDbService.GetBlogPostAsync(postId);
 
             if (bp == null) return View("PostNotFound");
-
-            // Check to see if there are any base64 images in the content and, if so,
-            // upload them to Azure Blob Storage and rewrite the content to reference the blob URLs.
-            blogPostChanges.Content = await UploadAnyBase64Images(blogPostChanges.Content, postId);
 
             // Do NOT reassign bp.Slug -- slugs are stable across edits (URL contracts).
             bp.Title = blogPostChanges.Title;
