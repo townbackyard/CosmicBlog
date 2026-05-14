@@ -14,6 +14,17 @@
         <h1>@Model.Title</h1>
     }
     <div class="text-muted mb-3">@Model.DateCreated.ToString("MMMM d, yyyy")</div>
+    @if (Model.Tags?.Any() == true)
+    {
+        <p class="text-muted small">
+            Tagged:
+            @foreach (var tag in Model.Tags)
+            {
+                <a asp-controller="Tag" asp-action="Tag" asp-route-tag="@tag">@tag</a>
+                <text> </text>
+            }
+        </p>
+    }
     <div>@Markdown.Render(Model.Content, Model.Format)</div>
     @if (!string.IsNullOrEmpty(Model.LinkUrl))
     {

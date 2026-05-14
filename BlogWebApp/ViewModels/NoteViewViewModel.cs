@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace BlogWebApp.ViewModels
 {
@@ -13,6 +14,8 @@ namespace BlogWebApp.ViewModels
         public string AuthorId { get; set; } = string.Empty;
         public string AuthorUsername { get; set; } = string.Empty;
         public DateTime DateCreated { get; set; }
+
+        public List<string> Tags { get; set; } = new();
 
         string IOgContent.Title => Title ?? string.Empty;  // explicit impl since the existing Title is nullable
         public string Description => Content.StripHtml().Truncate(160);

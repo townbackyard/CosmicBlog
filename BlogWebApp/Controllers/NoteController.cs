@@ -51,6 +51,7 @@ namespace BlogWebApp.Controllers
                 Title = note.Title,
                 Content = note.Content,
                 Format = note.Format,
+                Tags = note.Tags,
                 LinkUrl = note.LinkUrl,
                 AuthorId = note.AuthorId,
                 AuthorUsername = note.AuthorUsername,
@@ -85,8 +86,12 @@ namespace BlogWebApp.Controllers
                 .Split(',', StringSplitOptions.RemoveEmptyEntries)
                 .Select(t => t.Trim())
                 .Where(t => !string.IsNullOrEmpty(t))
-                .Take(12)
                 .ToList();
+            if (tags.Count > 12)
+            {
+                ModelState.AddModelError("Tags", "Maximum 12 tags per post.");
+                return View("NoteEdit", m);
+            }
 
             var note = new BlogPost
             {
@@ -147,8 +152,12 @@ namespace BlogWebApp.Controllers
                 .Split(',', StringSplitOptions.RemoveEmptyEntries)
                 .Select(t => t.Trim())
                 .Where(t => !string.IsNullOrEmpty(t))
-                .Take(12)
                 .ToList();
+            if (tags.Count > 12)
+            {
+                ModelState.AddModelError("Tags", "Maximum 12 tags per post.");
+                return View(m);
+            }
 
             // Preserve slug across edits (URL contract).
             note.Title = m.Title ?? string.Empty;

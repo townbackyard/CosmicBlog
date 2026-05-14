@@ -14,4 +14,15 @@
     <a asp-controller="BlogPost" asp-action="PostEdit" asp-route-postId="@Model.PostId">edit</a>
 }
 <p>Written by: @Model.AuthorUsername</p>
+@if (Model.Tags?.Any() == true)
+{
+    <p class="text-muted small">
+        Tagged:
+        @foreach (var tag in Model.Tags)
+        {
+            <a asp-controller="Tag" asp-action="Tag" asp-route-tag="@tag">@tag</a>
+            <text> </text>
+        }
+    </p>
+}
 <div>@Markdown.Render(Model.Content, Model.Format)</div>

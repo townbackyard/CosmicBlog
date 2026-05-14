@@ -1,5 +1,6 @@
 
 using System;
+using System.Collections.Generic;
 
 namespace BlogWebApp.ViewModels
 {
@@ -17,6 +18,8 @@ namespace BlogWebApp.ViewModels
         public string AuthorUsername { get; set; } = string.Empty;
 
         public DateTime DateCreated { get; set; }
+
+        public List<string> Tags { get; set; } = new();
 
         public string Description => Content.StripHtml().Truncate(160);
         public string UrlPath => $"/posts/{Slug}";

@@ -37,6 +37,11 @@ namespace BlogWebApp.Services
         // Excludes "now" — the Now page is read by id, not as feed content.
         Task<List<BlogPost>> GetActivityFeedAsync(int count);
 
+        // Tag-filtered query (public surface). Returns posts + notes whose Tags
+        // ARRAY_CONTAINS the requested tag, ordered DateCreated DESC, filtered
+        // to currently-published.
+        Task<List<BlogPost>> GetByTagAsync(string tag, int count);
+
         // Now singleton — there is exactly one document with id = "now-singleton"
         Task<BlogPost?> GetNowAsync();
 
@@ -237,6 +242,24 @@ namespace BlogWebApp.Services
             var query = new QueryDefinition(
                 $"SELECT TOP {count} * FROM p WHERE p.type IN ('post', 'note') AND p.status = 'published' AND p.publishedAtUtc <= @now ORDER BY p.dateCreated DESC")
                 .WithParameter("@now", nowUtc);
+
+            var results = new List<BlogPost>();
+            var iterator = _postsContainer.GetItemQueryIterator<BlogPost>(query);
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                results.AddRange(response);
+            }
+            return results;
+        }
+
+        public async Task<List<BlogPost>> GetByTagAsync(string tag, int count)
+        {
+            var nowUtc = DateTime.UtcNow;
+            var query = new QueryDefinition(
+                $"SELECT TOP {count} * FROM p WHERE p.type IN ('post', 'note') AND p.status = 'published' AND p.publishedAtUtc <= @now AND ARRAY_CONTAINS(p.tags, @tag) ORDER BY p.dateCreated DESC")
+                .WithParameter("@now", nowUtc)
+                .WithParameter("@tag", tag);
 
             var results = new List<BlogPost>();
             var iterator = _postsContainer.GetItemQueryIterator<BlogPost>(query);

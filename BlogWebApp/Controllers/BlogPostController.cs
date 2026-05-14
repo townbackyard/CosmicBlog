@@ -41,6 +41,7 @@ namespace BlogWebApp.Controllers
                 Title = bp.Title,
                 Content = bp.Content,
                 Format = bp.Format,
+                Tags = bp.Tags,
                 AuthorId = bp.AuthorId,
                 AuthorUsername = bp.AuthorUsername,
                 DateCreated = bp.DateCreated,
@@ -115,14 +116,18 @@ namespace BlogWebApp.Controllers
             if (string.IsNullOrEmpty(slug)) slug = postId.Substring(0, 8);
 
             // The hidden field arrives as a single comma-separated string; split on commas,
-            // trim, drop empties, enforce 12-cap server-side. (Task 11 hardens this with a
-            // 12-cap model error.)
+            // trim, drop empties, then enforce the 12-cap server-side with an explicit
+            // ModelState error (rather than silently truncating).
             var tags = (Request.Form["Tags"].ToString() ?? "")
                 .Split(',', StringSplitOptions.RemoveEmptyEntries)
                 .Select(t => t.Trim())
                 .Where(t => !string.IsNullOrEmpty(t))
-                .Take(12)
                 .ToList();
+            if (tags.Count > 12)
+            {
+                ModelState.AddModelError("Tags", "Maximum 12 tags per post.");
+                return View("PostEdit", blogPostChanges);
+            }
 
             var blogPost = new BlogPost
             {
@@ -172,8 +177,12 @@ namespace BlogWebApp.Controllers
                 .Split(',', StringSplitOptions.RemoveEmptyEntries)
                 .Select(t => t.Trim())
                 .Where(t => !string.IsNullOrEmpty(t))
-                .Take(12)
                 .ToList();
+            if (tags.Count > 12)
+            {
+                ModelState.AddModelError("Tags", "Maximum 12 tags per post.");
+                return View(blogPostChanges);
+            }
 
             // Do NOT reassign bp.Slug -- slugs are stable across edits (URL contracts).
             bp.Title = blogPostChanges.Title;
