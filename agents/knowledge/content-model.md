@@ -30,7 +30,7 @@ public class BlogPost
     public string AuthorId    { get; set; }         // -> "userId" in JSON (legacy naming)
     public string AuthorUsername { get; set; }      // -> "userUsername"
     public string Title       { get; set; }
-    public string Content     { get; set; }         // HTML (rendered as-is); TinyMCE-produced
+    public string Content     { get; set; }         // markdown source (new) or HTML (legacy); dispatched via IMarkdownRenderer on Format
     public int    CommentCount { get; set; }        // not surfaced in v1
     public int    LikeCount    { get; set; }        // not surfaced in v1
     public DateTime DateCreated { get; set; }
@@ -48,13 +48,15 @@ HTML (`Format = "html"`, for pre-Phase-1d content). `IMarkdownRenderer.Render(co
 dispatches: markdown → Markdig (with advanced extensions); html → emitted as-is.
 Views inject `IMarkdownRenderer` and call `Render` instead of `@Html.Raw`.
 
-## Content types and URL conventions (post-Phase-1c)
+## Content types and URL conventions (post-Phase-1d)
 
 | `Type` | Public URL | Admin URL | Notes |
 |---|---|---|---|
-| `post` | `/posts/{slug}` | `/post/new`, `/post/edit/{postId}` | Long-form. Slug is mandatory and immutable across edits. |
-| `note` | `/notes/{slug-or-id}` | `/notes/new`, `/notes/edit/{postId}` | Title optional; if title is empty, URL falls back to `postId` GUID. |
+| `post` | `/posts/{slug}` | `/admin/posts/new`, `/admin/posts/edit/{postId}` | Long-form. Slug is mandatory and immutable across edits. |
+| `note` | `/notes/{slug-or-id}` | `/admin/notes/new`, `/admin/notes/edit/{postId}` | Title optional; if title is empty, URL falls back to `postId` GUID. |
 | `now` | `/now` | `/admin/now` | Single-document page at fixed `postId = "now-singleton"`. |
+| tag listing | `/tag/{tag}` | (none) | Public cross-type listing of posts + notes that ARRAY_CONTAINS the tag. |
+| admin lists | (none) | `/admin/posts`, `/admin/notes` | Filterable by status (All / Drafts / Scheduled / Published). |
 
 ## Slug rules
 

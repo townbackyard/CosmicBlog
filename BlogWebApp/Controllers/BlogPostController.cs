@@ -42,6 +42,7 @@ namespace BlogWebApp.Controllers
                 Content = bp.Content,
                 Format = bp.Format,
                 Tags = bp.Tags,
+                Excerpt = bp.Excerpt,
                 AuthorId = bp.AuthorId,
                 AuthorUsername = bp.AuthorUsername,
                 DateCreated = bp.DateCreated,

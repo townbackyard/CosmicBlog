@@ -18,7 +18,20 @@ namespace BlogWebApp.ViewModels
         public List<string> Tags { get; set; } = new();
 
         string IOgContent.Title => Title ?? string.Empty;  // explicit impl since the existing Title is nullable
-        public string Description => Content.StripHtml().Truncate(160);
+
+        // Render Content through Markdig (if Format="markdown") so the strip doesn't
+        // leak literal markdown syntax (**bold**, #headings, [text](url)) into OG /
+        // JSON-LD descriptions. Notes don't carry an Excerpt field; the rendered-
+        // then-stripped content is the only source.
+        public string Description
+        {
+            get
+            {
+                var html = Format == "markdown" ? Markdig.Markdown.ToHtml(Content ?? string.Empty) : (Content ?? string.Empty);
+                return html.StripHtml().Truncate(160);
+            }
+        }
+
         public string UrlPath => $"/notes/{(string.IsNullOrEmpty(Slug) ? PostId : Slug)}";
     }
 }

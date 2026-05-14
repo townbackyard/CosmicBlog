@@ -16,12 +16,25 @@ namespace BlogWebApp.Controllers
     public class FeedController : Controller
     {
         private readonly IBlogCosmosDbService _blogDbService;
+        private readonly IMarkdownRenderer _markdown;
         private readonly AppSettings _appSettings;
 
-        public FeedController(IBlogCosmosDbService blogDbService, IOptions<AppSettings> appSettings)
+        public FeedController(IBlogCosmosDbService blogDbService, IMarkdownRenderer markdown, IOptions<AppSettings> appSettings)
         {
             _blogDbService = blogDbService;
+            _markdown = markdown;
             _appSettings = appSettings.Value;
+        }
+
+        // Renders content to HTML for feed payloads (RSS/Atom/JSON Feed all want
+        // pre-rendered HTML). Dispatches on Format like the view layer does.
+        private string RenderToHtml(string content, string format)
+        {
+            if (string.IsNullOrEmpty(content)) return string.Empty;
+            // IMarkdownRenderer returns IHtmlContent; convert to string via a writer.
+            using var sw = new System.IO.StringWriter();
+            _markdown.Render(content, format).WriteTo(sw, System.Text.Encodings.Web.HtmlEncoder.Default);
+            return sw.ToString();
         }
 
         [Route("feed")]
@@ -71,7 +84,7 @@ namespace BlogWebApp.Controllers
                     id = $"{site}/{ItemUrlPath(p.Type, p.Slug, p.PostId)}",
                     url = $"{site}/{ItemUrlPath(p.Type, p.Slug, p.PostId)}",
                     title = string.IsNullOrEmpty(p.Title) ? null : p.Title,
-                    content_html = p.Content,
+                    content_html = RenderToHtml(p.Content, p.Format),
                     external_url = p.LinkUrl,
                     date_published = p.DateCreated.ToString("o"),
                     tags = new[] { p.Type },  // "post" or "note" -- surfaces stream-type in clients that show tags
@@ -104,7 +117,7 @@ namespace BlogWebApp.Controllers
                 var url = $"{site}/{ItemUrlPath(p.Type, p.Slug, p.PostId)}";
                 var item = new SyndicationItem(
                     title: string.IsNullOrEmpty(p.Title) ? (p.Type == "note" ? "Note" : "Untitled") : p.Title,
-                    content: SyndicationContent.CreateHtmlContent(p.Content),
+                    content: SyndicationContent.CreateHtmlContent(RenderToHtml(p.Content, p.Format)),
                     itemAlternateLink: new Uri(url),
                     id: url,
                     lastUpdatedTime: p.DateUpdated ?? p.DateCreated);

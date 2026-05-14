@@ -21,7 +21,22 @@ namespace BlogWebApp.ViewModels
 
         public List<string> Tags { get; set; } = new();
 
-        public string Description => Content.StripHtml().Truncate(160);
+        public string? Excerpt { get; set; }
+
+        // Prefer the admin-authored Excerpt for OG / JSON-LD descriptions when present.
+        // Otherwise render Content through Markdig (if Format="markdown") so the strip
+        // doesn't leak literal markdown syntax (**bold**, #headings, [text](url)) into
+        // social previews.
+        public string Description
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(Excerpt)) return Excerpt;
+                var html = Format == "markdown" ? Markdig.Markdown.ToHtml(Content ?? string.Empty) : (Content ?? string.Empty);
+                return html.StripHtml().Truncate(160);
+            }
+        }
+
         public string UrlPath => $"/posts/{Slug}";
     }
 }
