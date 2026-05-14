@@ -57,11 +57,11 @@ namespace BlogWebApp.Controllers
             });
         }
 
-        [Route("notes/new")]
+        [Route("admin/notes/new")]
         [Authorize("RequireAdmin")]
         public IActionResult NoteNew() => View("NoteEdit", new NoteEditViewModel());
 
-        [Route("notes/new")]
+        [Route("admin/notes/new")]
         [Authorize("RequireAdmin")]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -100,7 +100,7 @@ namespace BlogWebApp.Controllers
             return View("NoteEdit", m);
         }
 
-        [Route("notes/edit/{postId}")]
+        [Route("admin/notes/edit/{postId}")]
         [Authorize("RequireAdmin")]
         public async Task<IActionResult> NoteEdit(string postId)
         {
@@ -115,7 +115,7 @@ namespace BlogWebApp.Controllers
             });
         }
 
-        [Route("notes/edit/{postId}")]
+        [Route("admin/notes/edit/{postId}")]
         [Authorize("RequireAdmin")]
         [HttpPost]
         [ValidateAntiForgeryToken]

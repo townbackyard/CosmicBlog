@@ -48,7 +48,7 @@ namespace BlogWebApp.Controllers
         }
 
 
-        [Route("post/new")]
+        [Route("admin/posts/new")]
         [Authorize("RequireAdmin")]
         public IActionResult PostNew()
         {
@@ -63,7 +63,7 @@ namespace BlogWebApp.Controllers
 
 
 
-        [Route("post/edit/{postId}")]
+        [Route("admin/posts/edit/{postId}")]
         [Authorize("RequireAdmin")]
         public async Task<IActionResult> PostEdit(string postId)
         {
@@ -84,7 +84,7 @@ namespace BlogWebApp.Controllers
         }
 
 
-        [Route("post/new")]
+        [Route("admin/posts/new")]
         [Authorize("RequireAdmin")]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -136,7 +136,7 @@ namespace BlogWebApp.Controllers
         }
 
 
-        [Route("post/edit/{postId}")]
+        [Route("admin/posts/edit/{postId}")]
         [Authorize("RequireAdmin")]
         [HttpPost]
         [ValidateAntiForgeryToken]

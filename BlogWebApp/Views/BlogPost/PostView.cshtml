@@ -11,7 +11,7 @@
 
 @if (User.IsInRole("Admin"))
 {
-    <a href="/post/edit/@Model.PostId">edit</a>
+    <a asp-controller="BlogPost" asp-action="PostEdit" asp-route-postId="@Model.PostId">edit</a>
 }
 <p>Written by: @Model.AuthorUsername</p>
 <div>@Markdown.Render(Model.Content, Model.Format)</div>
