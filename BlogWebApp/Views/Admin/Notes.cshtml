@@ -1,0 +1,52 @@
+@model List<BlogWebApp.Models.BlogPost>
+@{
+    ViewData["Title"] = "Admin — Notes";
+    var filter = ViewBag.StatusFilter as string;
+}
+
+<h1>Notes</h1>
+
+<div class="mb-3">
+    <a asp-controller="Admin" asp-action="Notes" class="@(string.IsNullOrEmpty(filter) ? "fw-bold" : "")">All</a> |
+    <a asp-controller="Admin" asp-action="Notes" asp-route-status="draft" class="@(filter == "draft" ? "fw-bold" : "")">Drafts</a> |
+    <a asp-controller="Admin" asp-action="Notes" asp-route-status="scheduled" class="@(filter == "scheduled" ? "fw-bold" : "")">Scheduled</a> |
+    <a asp-controller="Admin" asp-action="Notes" asp-route-status="published" class="@(filter == "published" ? "fw-bold" : "")">Published</a>
+    <span class="float-end">
+        <a asp-controller="Note" asp-action="NoteNew" class="btn btn-primary btn-sm">+ New Note</a>
+    </span>
+</div>
+
+@if (!Model.Any())
+{
+    <p>No notes.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr><th>Title</th><th>Status</th><th>Publish date</th><th>Updated</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var n in Model)
+        {
+            var derivedStatus = (n.Status == "published" && n.PublishedAtUtc.HasValue && n.PublishedAtUtc.Value > DateTime.UtcNow)
+                ? "scheduled" : n.Status;
+            var slugOrId = string.IsNullOrEmpty(n.Slug) ? n.PostId : n.Slug;
+            <tr>
+                <td>@(string.IsNullOrEmpty(n.Title) ? "(untitled)" : n.Title)</td>
+                <td>@derivedStatus</td>
+                <td>@(n.PublishedAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+                <td>@((n.DateUpdated ?? n.DateCreated).ToString("yyyy-MM-dd"))</td>
+                <td>
+                    <a asp-controller="Note" asp-action="NoteEdit" asp-route-postId="@n.PostId">edit</a>
+                    @if (derivedStatus == "published")
+                    {
+                        <span> · </span>
+                        <a asp-controller="Note" asp-action="NoteView" asp-route-slugOrId="@slugOrId">view</a>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
