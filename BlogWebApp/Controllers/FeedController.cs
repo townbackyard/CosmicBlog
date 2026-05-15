@@ -16,12 +16,25 @@ namespace BlogWebApp.Controllers
     public class FeedController : Controller
     {
         private readonly IBlogCosmosDbService _blogDbService;
+        private readonly IMarkdownRenderer _markdown;
         private readonly AppSettings _appSettings;
 
-        public FeedController(IBlogCosmosDbService blogDbService, IOptions<AppSettings> appSettings)
+        public FeedController(IBlogCosmosDbService blogDbService, IMarkdownRenderer markdown, IOptions<AppSettings> appSettings)
         {
             _blogDbService = blogDbService;
+            _markdown = markdown;
             _appSettings = appSettings.Value;
+        }
+
+        // Renders content to HTML for feed payloads (RSS/Atom/JSON Feed all want
+        // pre-rendered HTML). Dispatches on Format like the view layer does.
+        private string RenderToHtml(string content, string format)
+        {
+            if (string.IsNullOrEmpty(content)) return string.Empty;
+            // IMarkdownRenderer returns IHtmlContent; convert to string via a writer.
+            using var sw = new System.IO.StringWriter();
+            _markdown.Render(content, format).WriteTo(sw, System.Text.Encodings.Web.HtmlEncoder.Default);
+            return sw.ToString();
         }
 
         [Route("feed")]
@@ -71,9 +84,9 @@ namespace BlogWebApp.Controllers
                     id = $"{site}/{ItemUrlPath(p.Type, p.Slug, p.PostId)}",
                     url = $"{site}/{ItemUrlPath(p.Type, p.Slug, p.PostId)}",
                     title = string.IsNullOrEmpty(p.Title) ? null : p.Title,
-                    content_html = p.Content,
+                    content_html = RenderToHtml(p.Content, p.Format),
                     external_url = p.LinkUrl,
-                    date_published = p.DateCreated.ToString("o"),
+                    date_published = (p.PublishedAtUtc ?? p.DateCreated).ToString("o"),
                     tags = new[] { p.Type },  // "post" or "note" -- surfaces stream-type in clients that show tags
                 }).ToArray(),
             };
@@ -97,18 +110,19 @@ namespace BlogWebApp.Controllers
                 new Uri(site));
             feed.Authors.Add(new SyndicationPerson(_appSettings.OwnerEmail, _appSettings.OwnerName, site));
             feed.Language = "en-us";
-            feed.LastUpdatedTime = posts.Any() ? posts.Max(p => p.DateCreated) : DateTime.UtcNow;
+            feed.LastUpdatedTime = posts.Any() ? posts.Max(p => p.PublishedAtUtc ?? p.DateCreated) : DateTime.UtcNow;
 
             feed.Items = posts.Select(p =>
             {
                 var url = $"{site}/{ItemUrlPath(p.Type, p.Slug, p.PostId)}";
+                var publishedAt = p.PublishedAtUtc ?? p.DateCreated;
                 var item = new SyndicationItem(
                     title: string.IsNullOrEmpty(p.Title) ? (p.Type == "note" ? "Note" : "Untitled") : p.Title,
-                    content: SyndicationContent.CreateHtmlContent(p.Content),
+                    content: SyndicationContent.CreateHtmlContent(RenderToHtml(p.Content, p.Format)),
                     itemAlternateLink: new Uri(url),
                     id: url,
-                    lastUpdatedTime: p.DateUpdated ?? p.DateCreated);
-                item.PublishDate = p.DateCreated;
+                    lastUpdatedTime: p.DateUpdated ?? publishedAt);
+                item.PublishDate = publishedAt;
                 item.Authors.Add(new SyndicationPerson(_appSettings.OwnerEmail, p.AuthorUsername, site));
                 return item;
             }).ToList();

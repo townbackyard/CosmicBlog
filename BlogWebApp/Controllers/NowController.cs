@@ -51,6 +51,7 @@ namespace BlogWebApp.Controllers
             };
 
             now.Content = m.Content;
+            now.Format = "markdown";
             await _blogDbService.UpsertNowAsync(now);
 
             ViewBag.Success = true;

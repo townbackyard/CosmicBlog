@@ -24,9 +24,23 @@ namespace BlogWebApp.Services
         // Type-filtered most-recent query (used by /posts, /notes pages)
         Task<List<BlogPost>> GetMostRecentByTypeAsync(string type, int count);
 
+        // Admin-only queries (no status/date filter). Used by /admin/posts and
+        // /admin/notes list views; returns drafts + scheduled + published.
+        Task<List<BlogPost>> GetAllByTypeAsync(string type, int count);
+
+        // Admin-only single-doc fetch by slug (for the admin edit-by-slug flow).
+        // Same as GetBlogPostBySlugAsync but without the status filter, so admins
+        // can fetch their own drafts.
+        Task<BlogPost?> GetBlogPostBySlugForAdminAsync(string type, string slug);
+
         // Unified activity-feed query (posts + notes interleaved by dateCreated DESC).
         // Excludes "now" — the Now page is read by id, not as feed content.
         Task<List<BlogPost>> GetActivityFeedAsync(int count);
+
+        // Tag-filtered query (public surface). Returns posts + notes whose Tags
+        // ARRAY_CONTAINS the requested tag, ordered DateCreated DESC, filtered
+        // to currently-published.
+        Task<List<BlogPost>> GetByTagAsync(string tag, int count);
 
         // Now singleton — there is exactly one document with id = "now-singleton"
         Task<BlogPost?> GetNowAsync();
@@ -156,6 +170,24 @@ namespace BlogWebApp.Services
 
         public async Task<BlogPost?> GetBlogPostBySlugAsync(string type, string slug)
         {
+            var nowUtc = DateTime.UtcNow;
+            var query = new QueryDefinition(
+                "SELECT TOP 1 * FROM p WHERE p.type = @type AND p.slug = @slug AND p.status = 'published' AND p.publishedAtUtc <= @now")
+                .WithParameter("@type", type)
+                .WithParameter("@slug", slug)
+                .WithParameter("@now", nowUtc);
+
+            var iterator = _postsContainer.GetItemQueryIterator<BlogPost>(query);
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                foreach (var item in response) return item;
+            }
+            return null;
+        }
+
+        public async Task<BlogPost?> GetBlogPostBySlugForAdminAsync(string type, string slug)
+        {
             var query = new QueryDefinition(
                 "SELECT TOP 1 * FROM p WHERE p.type = @type AND p.slug = @slug")
                 .WithParameter("@type", type)
@@ -171,6 +203,27 @@ namespace BlogWebApp.Services
         }
 
         public async Task<List<BlogPost>> GetMostRecentByTypeAsync(string type, int count)
+        {
+            var nowUtc = DateTime.UtcNow;
+            // ORDER BY publishedAtUtc so scheduled items surface at the right position
+            // when their time arrives. Phase 1d migration backfills publishedAtUtc=
+            // dateCreated for legacy docs so pre-Phase-1d posts retain ordering.
+            var query = new QueryDefinition(
+                $"SELECT TOP {count} * FROM p WHERE p.type = @type AND p.status = 'published' AND p.publishedAtUtc <= @now ORDER BY p.publishedAtUtc DESC")
+                .WithParameter("@type", type)
+                .WithParameter("@now", nowUtc);
+
+            var results = new List<BlogPost>();
+            var iterator = _postsContainer.GetItemQueryIterator<BlogPost>(query);
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                results.AddRange(response);
+            }
+            return results;
+        }
+
+        public async Task<List<BlogPost>> GetAllByTypeAsync(string type, int count)
         {
             var query = new QueryDefinition(
                 $"SELECT TOP {count} * FROM p WHERE p.type = @type ORDER BY p.dateCreated DESC")
@@ -188,8 +241,30 @@ namespace BlogWebApp.Services
 
         public async Task<List<BlogPost>> GetActivityFeedAsync(int count)
         {
+            var nowUtc = DateTime.UtcNow;
+            // ORDER BY publishedAtUtc -- see GetMostRecentByTypeAsync for rationale.
             var query = new QueryDefinition(
-                $"SELECT TOP {count} * FROM p WHERE p.type IN ('post', 'note') ORDER BY p.dateCreated DESC");
+                $"SELECT TOP {count} * FROM p WHERE p.type IN ('post', 'note') AND p.status = 'published' AND p.publishedAtUtc <= @now ORDER BY p.publishedAtUtc DESC")
+                .WithParameter("@now", nowUtc);
+
+            var results = new List<BlogPost>();
+            var iterator = _postsContainer.GetItemQueryIterator<BlogPost>(query);
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                results.AddRange(response);
+            }
+            return results;
+        }
+
+        public async Task<List<BlogPost>> GetByTagAsync(string tag, int count)
+        {
+            var nowUtc = DateTime.UtcNow;
+            // ORDER BY publishedAtUtc -- see GetMostRecentByTypeAsync for rationale.
+            var query = new QueryDefinition(
+                $"SELECT TOP {count} * FROM p WHERE p.type IN ('post', 'note') AND p.status = 'published' AND p.publishedAtUtc <= @now AND ARRAY_CONTAINS(p.tags, @tag) ORDER BY p.publishedAtUtc DESC")
+                .WithParameter("@now", nowUtc)
+                .WithParameter("@tag", tag);
 
             var results = new List<BlogPost>();
             var iterator = _postsContainer.GetItemQueryIterator<BlogPost>(query);

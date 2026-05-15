@@ -1,0 +1,39 @@
+@model List<BlogWebApp.Models.BlogPost>
+@inject BlogWebApp.Services.IMarkdownRenderer Markdown
+@{
+    ViewData["Title"] = $"Tag: {ViewBag.Tag}";
+}
+
+<h1>Tag: <code>@ViewBag.Tag</code></h1>
+
+@if (!Model.Any())
+{
+    <p>Nothing tagged <code>@ViewBag.Tag</code> yet.</p>
+}
+else
+{
+    <ul class="list-unstyled">
+        @foreach (var item in Model)
+        {
+            var slugOrId = string.IsNullOrEmpty(item.Slug) ? item.PostId : item.Slug;
+            var itemUrl = item.Type == "post"
+                ? Url.Action("PostView", "BlogPost", new { slug = item.Slug })
+                : Url.Action("NoteView", "Note", new { slugOrId = slugOrId });
+            <li class="mb-4 pb-3 border-bottom">
+                <div class="small text-uppercase text-muted mb-1">@item.Type · @item.DateCreated.ToString("MMM d, yyyy")</div>
+                @if (!string.IsNullOrEmpty(item.Title))
+                {
+                    <h3 class="mb-1"><a href="@itemUrl">@item.Title</a></h3>
+                }
+                @if (item.Type == "note")
+                {
+                    <div>@Markdown.Render(item.Content, item.Format)</div>
+                }
+                else
+                {
+                    <p><a href="@itemUrl">Read post →</a></p>
+                }
+            </li>
+        }
+    </ul>
+}

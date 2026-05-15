@@ -26,9 +26,44 @@
 
     <div class="mb-3">
         <label asp-for="Content" class="form-label"></label>
-        <textarea asp-for="Content" class="form-control" rows="10"></textarea>
+        <textarea asp-for="Content" id="content" class="form-control" rows="10"></textarea>
         <span asp-validation-for="Content" class="text-danger"></span>
+    </div>
+
+    <div class="mb-3">
+        <label for="tags-input" class="form-label">Tags (comma-separated, max 12)</label>
+        <input id="tags-input" class="form-control" value="@string.Join(", ", Model.Tags)" />
+        <input type="hidden" name="Tags" id="tags-hidden" />
+        <small class="form-text text-muted" id="tags-count">0 / 12 tags</small>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label">Status</label>
+            <select asp-for="Status" class="form-select">
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="PublishedAtUtc" class="form-label">Publish at (UTC; leave blank for "now")</label>
+            <input asp-for="PublishedAtUtc" type="datetime-local" class="form-control" />
+        </div>
     </div>
 
     <button type="submit" class="btn btn-primary">Save</button>
 </form>
+
+@section Scripts{
+    <script src="~/lib/easymde/dist/easymde.min.js"></script>
+    <script src="~/js/admin-editor.js"></script>
+    <script>
+        cosmicblog.adminEditor.init({
+            textareaSelector: '#content',
+            postId: '@(Model.PostId ?? "")',
+            postType: 'note',
+            uploadEndpoint: '/admin/image',
+            autosaveEndpoint: '/admin/draft/save'
+        });
+    </script>
+}

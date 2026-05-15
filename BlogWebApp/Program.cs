@@ -26,6 +26,7 @@ var storageBlobConnectionString = builder.Configuration.GetValue<string>("Storag
     ?? throw new InvalidOperationException("StorageBlobConnectionString is not configured.");
 builder.Services.AddSingleton<IImageStorageManager>(new ImageStorageManager(storageBlobConnectionString));
 builder.Services.AddSingleton<IEmailSender, AcsEmailSender>();
+builder.Services.AddSingleton<IMarkdownRenderer, MarkdownRenderer>();
 
 // Identity wiring — Cosmos-backed UserStore (no SQL sidecar).
 builder.Services.AddSingleton<IUserStore<CosmicBlogUser>>(sp =>
@@ -196,28 +197,96 @@ static async Task<(CosmosClient, BlogCosmosDbService)> InitializeCosmosBlogClien
     await UpsertTriggerAsync(feedContainer, @"CosmosDbScripts\triggers\truncateFeed.js", TriggerOperation.All, TriggerType.Post);
 
     // Seed a Hello World post on first run so the home page is never empty.
+    const string helloWorldPostMarkdown = @"Hi there!
+
+Welcome to CosmicBlog — a learn-in-public blog engine on .NET 10 + Azure Cosmos DB. The Cosmos partition strategy is based on the Microsoft docs article [How to model and partition data on Azure Cosmos DB using a real-world example](https://docs.microsoft.com/en-us/azure/cosmos-db/how-to-model-partition-example).
+
+To login as the Blog Administrator, set `COSMICBLOG_BOOTSTRAP_ADMIN_EMAIL` and `COSMICBLOG_BOOTSTRAP_ADMIN_PASSWORD` environment variables on first run to bootstrap the admin account.
+
+Please post any issues that you have with this code to the repository at <https://github.com/townbackyard/CosmicBlog/issues>.
+";
+
     if (insertHelloWorldPost)
     {
-        const string helloWorldPostHtml = @"
-                <p>Hi there!</p>
-                <p>Welcome to CosmicBlog — a learn-in-public blog engine on .NET 10 + Azure Cosmos DB. The Cosmos partition strategy is based on the Microsoft docs article <a target='_blank' href='https://docs.microsoft.com/en-us/azure/cosmos-db/how-to-model-partition-example'>How to model and partition data on Azure Cosmos DB using a real-world example</a>.</p>
-                <p>To login as the Blog Administrator, set COSMICBLOG_BOOTSTRAP_ADMIN_EMAIL and COSMICBLOG_BOOTSTRAP_ADMIN_PASSWORD environment variables on first run to bootstrap the admin account.</p>
-                <p>Please post any issues that you have with this code to the repository at <a target='_blank' href='https://github.com/townbackyard/CosmicBlog/issues'>https://github.com/townbackyard/CosmicBlog/issues</a></p>
-        ";
-
         var helloWorldPost = new BlogPost
         {
             PostId = Guid.NewGuid().ToString(),
             Type = "post",
             Slug = "hello-world",
+            Format = "markdown",
+            Status = "published",
+            PublishedAtUtc = DateTime.UtcNow,
             Title = "Hello World!",
-            Content = helloWorldPostHtml,
+            Content = helloWorldPostMarkdown,
             AuthorId = Guid.NewGuid().ToString(),
             AuthorUsername = "HelloWorldAdmin",
             DateCreated = DateTime.UtcNow,
         };
 
         await postsContainer.UpsertItemAsync(helloWorldPost, new PartitionKey(helloWorldPost.PostId));
+    }
+
+    // Phase 1d migration: backfill Format / Status / PublishedAtUtc on legacy
+    // BlogPost docs that don't have those fields set. Iterates as JObject so
+    // the C# property initializer defaults (Format="markdown", Status="published")
+    // don't mask which fields were actually missing in the stored JSON. Filters
+    // by p.type so comment/like docs (which share the Posts partition) are
+    // untouched -- their absence would otherwise project into half-empty
+    // BlogPost shapes and overwrite their parent posts on upsert.
+    //
+    // Idempotent: once a doc has been backfilled, the IS_DEFINED filter
+    // excludes it from subsequent runs. A partial failure mid-loop leaves
+    // already-upserted docs migrated; a re-run picks up the rest.
+    var migrationQuery = new QueryDefinition(
+        "SELECT * FROM p WHERE p.type IN ('post', 'note', 'now') AND (NOT IS_DEFINED(p.format) OR NOT IS_DEFINED(p.status) OR NOT IS_DEFINED(p.publishedAtUtc))");
+    var migrationIter = postsContainer.GetItemQueryIterator<Newtonsoft.Json.Linq.JObject>(migrationQuery);
+    int migrated = 0;
+    while (migrationIter.HasMoreResults)
+    {
+        var resp = await migrationIter.ReadNextAsync();
+        foreach (var doc in resp)
+        {
+            // Legacy docs are all considered HTML and currently-published.
+            // PublishedAtUtc defaults to DateCreated for backward-compatible ordering.
+            if (doc["format"] == null) doc["format"] = "html";
+            if (doc["status"] == null) doc["status"] = "published";
+            if (doc["publishedAtUtc"] == null) doc["publishedAtUtc"] = doc["dateCreated"];
+            var postId = doc["postId"]?.ToString()
+                ?? throw new InvalidOperationException("Legacy Posts doc missing postId during Phase 1d migration");
+            await postsContainer.UpsertItemAsync(doc, new PartitionKey(postId));
+            migrated++;
+        }
+    }
+    if (migrated > 0)
+    {
+        Console.WriteLine($"Phase 1d migration: backfilled {migrated} legacy Posts docs with Format/Status/PublishedAtUtc.");
+    }
+
+    // Phase 1d follow-up: convert the legacy Hello-World seed (originally
+    // committed as Format="html") to markdown so it round-trips cleanly in
+    // EasyMDE. Signature-matched on slug + format + authorUsername so user-
+    // authored posts are never touched. Idempotent: subsequent runs see
+    // format="markdown" and skip.
+    var seedQuery = new QueryDefinition(
+        "SELECT * FROM p WHERE p.slug = 'hello-world' AND p.format = 'html' AND p.userUsername = 'HelloWorldAdmin'");
+    var seedIter = postsContainer.GetItemQueryIterator<Newtonsoft.Json.Linq.JObject>(seedQuery);
+    int seedsConverted = 0;
+    while (seedIter.HasMoreResults)
+    {
+        var resp = await seedIter.ReadNextAsync();
+        foreach (var doc in resp)
+        {
+            doc["format"] = "markdown";
+            doc["content"] = helloWorldPostMarkdown;
+            var postId = doc["postId"]?.ToString()
+                ?? throw new InvalidOperationException("Hello-World seed doc missing postId during markdown conversion");
+            await postsContainer.UpsertItemAsync(doc, new PartitionKey(postId));
+            seedsConverted++;
+        }
+    }
+    if (seedsConverted > 0)
+    {
+        Console.WriteLine($"Phase 1d follow-up: converted {seedsConverted} Hello-World seed doc(s) from HTML to markdown.");
     }
 
     return (client, blogCosmosDbService);

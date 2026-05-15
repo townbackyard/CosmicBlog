@@ -39,6 +39,39 @@ namespace BlogWebApp.Models
         [JsonProperty(PropertyName = "dateUpdated")]
         public DateTime? DateUpdated { get; set; }
 
+        /// <summary>
+        /// Lifecycle status. Valid values: "draft", "published". "Scheduled" is the
+        /// derived state when Status="published" AND PublishedAtUtc > UtcNow.
+        /// Public queries filter Status="published" AND PublishedAtUtc <= UtcNow.
+        /// </summary>
+        [JsonProperty(PropertyName = "status")]
+        public string Status { get; set; } = "published";
+
+        /// <summary>
+        /// When the post becomes publicly visible. Can be in the future (scheduled).
+        /// Distinct from DateCreated; for legacy posts without this field, public
+        /// queries should fall back to DateCreated (handled at query construction).
+        /// </summary>
+        [JsonProperty(PropertyName = "publishedAtUtc")]
+        public DateTime? PublishedAtUtc { get; set; }
+
+        /// <summary>
+        /// Content serialization format. Valid values: "markdown", "html". New content
+        /// is "markdown"; legacy content (Phase 1c TinyMCE output, Hello-World seed)
+        /// is "html". The view layer dispatches the renderer on this field.
+        /// </summary>
+        [JsonProperty(PropertyName = "format")]
+        public string Format { get; set; } = "markdown";
+
+        [JsonProperty(PropertyName = "tags")]
+        public List<string> Tags { get; set; } = new();
+
+        [JsonProperty(PropertyName = "excerpt")]
+        public string? Excerpt { get; set; }
+
+        [JsonProperty(PropertyName = "coverImageUrl")]
+        public string? CoverImageUrl { get; set; }
+
         [JsonProperty(PropertyName = "userId")]
         public string AuthorId { get; set; } = string.Empty;
 

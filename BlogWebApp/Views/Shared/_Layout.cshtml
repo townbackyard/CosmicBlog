@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - @AppSettings.Value.BlogName</title>
     <link rel="stylesheet" href="~/lib/bootstrap/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/easymde/dist/easymde.min.css" />
     <link rel="alternate" type="application/rss+xml" title="@AppSettings.Value.BlogName — RSS" href="/feed" />
     <link rel="alternate" type="application/atom+xml" title="@AppSettings.Value.BlogName — Atom" href="/feed.atom" />
     <link rel="alternate" type="application/feed+json" title="@AppSettings.Value.BlogName — JSON Feed" href="/feed.json" />
@@ -32,9 +33,9 @@
                     <ul class="navbar-nav">
                         @if (User.Identity?.IsAuthenticated == true && User.IsInRole("Admin"))
                         {
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="BlogPost" asp-action="PostNew">+ Post</a></li>
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Note" asp-action="NoteNew">+ Note</a></li>
-                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Now" asp-action="NowEdit">Edit Now</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Admin" asp-action="Posts">Posts</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Admin" asp-action="Notes">Notes</a></li>
+                            <li class="nav-item"><a class="nav-link text-dark" asp-controller="Now" asp-action="NowEdit">Now</a></li>
                             <li class="nav-item"><a class="nav-link text-dark" asp-controller="Account" asp-action="ChangePassword">Account</a></li>
                             <li class="nav-item">
                                 <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">

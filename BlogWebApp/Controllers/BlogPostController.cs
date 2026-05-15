@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using BlogWebApp.ViewModels;
 using Microsoft.AspNetCore.Mvc;
@@ -39,6 +40,9 @@ namespace BlogWebApp.Controllers
                 Slug = bp.Slug,
                 Title = bp.Title,
                 Content = bp.Content,
+                Format = bp.Format,
+                Tags = bp.Tags,
+                Excerpt = bp.Excerpt,
                 AuthorId = bp.AuthorId,
                 AuthorUsername = bp.AuthorUsername,
                 DateCreated = bp.DateCreated,
@@ -47,7 +51,7 @@ namespace BlogWebApp.Controllers
         }
 
 
-        [Route("post/new")]
+        [Route("admin/posts/new")]
         [Authorize("RequireAdmin")]
         public IActionResult PostNew()
         {
@@ -62,7 +66,7 @@ namespace BlogWebApp.Controllers
 
 
 
-        [Route("post/edit/{postId}")]
+        [Route("admin/posts/edit/{postId}")]
         [Authorize("RequireAdmin")]
         public async Task<IActionResult> PostEdit(string postId)
         {
@@ -75,15 +79,21 @@ namespace BlogWebApp.Controllers
 
             var m = new BlogPostEditViewModel
             {
+                PostId = bp.PostId,
                 Title = bp.Title,
                 Content = bp.Content,
                 Slug = bp.Slug,
+                Status = bp.Status,
+                PublishedAtUtc = bp.PublishedAtUtc,
+                Tags = bp.Tags,
+                Excerpt = bp.Excerpt,
+                CoverImageUrl = bp.CoverImageUrl,
             };
             return View(m);
         }
 
 
-        [Route("post/new")]
+        [Route("admin/posts/new")]
         [Authorize("RequireAdmin")]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -94,9 +104,11 @@ namespace BlogWebApp.Controllers
             var postId = Guid.NewGuid().ToString();
             var slug = SlugGenerator.FromTitle(blogPostChanges.Title);
 
-            // Ensure slug uniqueness — append short suffix on collision
+            // Ensure slug uniqueness — append short suffix on collision.
+            // Uses the admin lookup so drafts/scheduled posts also count for uniqueness;
+            // otherwise two drafts could grab the same slug and collide once both publish.
             if (!string.IsNullOrEmpty(slug)
-                && await _blogDbService.GetBlogPostBySlugAsync("post", slug) != null)
+                && await _blogDbService.GetBlogPostBySlugForAdminAsync("post", slug) != null)
             {
                 slug = $"{slug}-{postId.Substring(0, 8)}";
             }
@@ -106,17 +118,34 @@ namespace BlogWebApp.Controllers
             // existing view model), but it's defensive.
             if (string.IsNullOrEmpty(slug)) slug = postId.Substring(0, 8);
 
-            // Check to see if there are any base64 images in the content and, if so,
-            // upload them to Azure Blob Storage and rewrite the content to reference the blob URLs.
-            blogPostChanges.Content = await UploadAnyBase64Images(blogPostChanges.Content, postId);
+            // The hidden field arrives as a single comma-separated string; split on commas,
+            // trim, drop empties, then enforce the 12-cap server-side with an explicit
+            // ModelState error (rather than silently truncating).
+            var tags = (Request.Form["Tags"].ToString() ?? "")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .Where(t => !string.IsNullOrEmpty(t))
+                .ToList();
+            if (tags.Count > 12)
+            {
+                ModelState.AddModelError("Tags", "Maximum 12 tags per post.");
+                return View("PostEdit", blogPostChanges);
+            }
 
             var blogPost = new BlogPost
             {
                 PostId = postId,
                 Type = "post",
                 Slug = slug,
+                Format = "markdown",
+                Status = blogPostChanges.Status,
+                PublishedAtUtc = blogPostChanges.PublishedAtUtc
+                                 ?? (blogPostChanges.Status == "published" ? DateTime.UtcNow : (DateTime?)null),
                 Title = blogPostChanges.Title,
                 Content = blogPostChanges.Content,
+                Excerpt = blogPostChanges.Excerpt,
+                CoverImageUrl = blogPostChanges.CoverImageUrl,
+                Tags = tags,
                 AuthorId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                     ?? throw new InvalidOperationException("Authenticated user has no NameIdentifier claim."),
                 AuthorUsername = User.Identity?.Name
@@ -129,13 +158,14 @@ namespace BlogWebApp.Controllers
 
             //Show the view with a message that the blog post has been created.
             ViewBag.Success = true;
-            blogPostChanges.Slug = slug;  // populate so the Cancel/preview link in PostEdit.cshtml resolves to /posts/{slug}
+            blogPostChanges.PostId = postId;  // wire up the autosave endpoint so subsequent edits update THIS post, not create another
+            blogPostChanges.Slug = slug;      // so the Cancel/preview link in PostEdit.cshtml resolves to /posts/{slug}
 
             return View("PostEdit", blogPostChanges);
         }
 
 
-        [Route("post/edit/{postId}")]
+        [Route("admin/posts/edit/{postId}")]
         [Authorize("RequireAdmin")]
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -147,13 +177,44 @@ namespace BlogWebApp.Controllers
 
             if (bp == null) return View("PostNotFound");
 
-            // Check to see if there are any base64 images in the content and, if so,
-            // upload them to Azure Blob Storage and rewrite the content to reference the blob URLs.
-            blogPostChanges.Content = await UploadAnyBase64Images(blogPostChanges.Content, postId);
+            var tags = (Request.Form["Tags"].ToString() ?? "")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .Where(t => !string.IsNullOrEmpty(t))
+                .ToList();
+            if (tags.Count > 12)
+            {
+                ModelState.AddModelError("Tags", "Maximum 12 tags per post.");
+                return View(blogPostChanges);
+            }
 
-            // Do NOT reassign bp.Slug -- slugs are stable across edits (URL contracts).
+            // Generate a slug if this post never got one (autosave-created drafts skip
+            // slug generation -- they only mint a postId). Otherwise slugs are stable
+            // across edits (URL contracts).
+            if (string.IsNullOrEmpty(bp.Slug) && !string.IsNullOrWhiteSpace(blogPostChanges.Title))
+            {
+                var newSlug = SlugGenerator.FromTitle(blogPostChanges.Title);
+                if (!string.IsNullOrEmpty(newSlug)
+                    && await _blogDbService.GetBlogPostBySlugForAdminAsync("post", newSlug) != null)
+                {
+                    newSlug = $"{newSlug}-{postId.Substring(0, 8)}";
+                }
+                if (string.IsNullOrEmpty(newSlug)) newSlug = postId.Substring(0, 8);
+                bp.Slug = newSlug;
+            }
+
             bp.Title = blogPostChanges.Title;
             bp.Content = blogPostChanges.Content;
+            // EasyMDE produces markdown; legacy HTML posts edited through the new editor
+            // are flipped to markdown so newly-typed syntax actually renders. Markdig
+            // passes inline HTML through, so legacy <p>/<a> markup keeps rendering too.
+            bp.Format = "markdown";
+            bp.Excerpt = blogPostChanges.Excerpt;
+            bp.CoverImageUrl = blogPostChanges.CoverImageUrl;
+            bp.Tags = tags;
+            bp.Status = blogPostChanges.Status;
+            bp.PublishedAtUtc = blogPostChanges.PublishedAtUtc
+                                ?? (bp.Status == "published" && !bp.PublishedAtUtc.HasValue ? DateTime.UtcNow : bp.PublishedAtUtc);
             bp.DateUpdated = DateTime.UtcNow;
 
             //Update the database with these changes.
@@ -161,6 +222,7 @@ namespace BlogWebApp.Controllers
 
             //Show the view with a message that the blog post has been updated.
             ViewBag.Success = true;
+            blogPostChanges.Slug = bp.Slug;  // reflect any slug just minted for an autosave-created draft
 
             return View(blogPostChanges);
         }

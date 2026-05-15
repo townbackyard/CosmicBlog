@@ -21,10 +21,16 @@ public class BlogPost
     public string Slug        { get; set; } = string.Empty;
     public string? LinkUrl    { get; set; }             // notes only
     public DateTime? DateUpdated { get; set; }
+    public string Status              { get; set; } = "published";  // "draft" | "published"
+    public DateTime? PublishedAtUtc   { get; set; }                  // future = scheduled
+    public string Format              { get; set; } = "markdown";    // "markdown" | "html" (legacy)
+    public List<string> Tags          { get; set; } = new();
+    public string? Excerpt            { get; set; }
+    public string? CoverImageUrl      { get; set; }
     public string AuthorId    { get; set; }         // -> "userId" in JSON (legacy naming)
     public string AuthorUsername { get; set; }      // -> "userUsername"
     public string Title       { get; set; }
-    public string Content     { get; set; }         // HTML (rendered as-is); TinyMCE-produced
+    public string Content     { get; set; }         // markdown source (new) or HTML (legacy); dispatched via IMarkdownRenderer on Format
     public int    CommentCount { get; set; }        // not surfaced in v1
     public int    LikeCount    { get; set; }        // not surfaced in v1
     public DateTime DateCreated { get; set; }
@@ -35,13 +41,22 @@ JSON property names use Newtonsoft `[JsonProperty(PropertyName = "...")]`. `Id` 
 
 `CommentCount` / `LikeCount` survive in the schema for change-feed compatibility but are not read or written from the public surface.
 
-## Content types and URL conventions (post-Phase-1c)
+## Markdown rendering
+
+Content is stored as either markdown source (`Format = "markdown"`) or rendered
+HTML (`Format = "html"`, for pre-Phase-1d content). `IMarkdownRenderer.Render(content, format)`
+dispatches: markdown → Markdig (with advanced extensions); html → emitted as-is.
+Views inject `IMarkdownRenderer` and call `Render` instead of `@Html.Raw`.
+
+## Content types and URL conventions (post-Phase-1d)
 
 | `Type` | Public URL | Admin URL | Notes |
 |---|---|---|---|
-| `post` | `/posts/{slug}` | `/post/new`, `/post/edit/{postId}` | Long-form. Slug is mandatory and immutable across edits. |
-| `note` | `/notes/{slug-or-id}` | `/notes/new`, `/notes/edit/{postId}` | Title optional; if title is empty, URL falls back to `postId` GUID. |
+| `post` | `/posts/{slug}` | `/admin/posts/new`, `/admin/posts/edit/{postId}` | Long-form. Slug is mandatory and immutable across edits. |
+| `note` | `/notes/{slug-or-id}` | `/admin/notes/new`, `/admin/notes/edit/{postId}` | Title optional; if title is empty, URL falls back to `postId` GUID. |
 | `now` | `/now` | `/admin/now` | Single-document page at fixed `postId = "now-singleton"`. |
+| tag listing | `/tag/{tag}` | (none) | Public cross-type listing of posts + notes that ARRAY_CONTAINS the tag. |
+| admin lists | (none) | `/admin/posts`, `/admin/notes` | Filterable by status (All / Drafts / Scheduled / Published). |
 
 ## Slug rules
 
@@ -72,10 +87,7 @@ Phase 1c stores the Now page as a single Cosmos document:
 
 ## What's NOT in the content model
 
-Phase 1c does **not** add:
-- Tags (`tags[]`) — Phase 1d (couples with tag-cap UI discipline in spec §5).
-- Excerpts / cover images — Phase 1d (authoring UI).
-- Draft / scheduled status — Phase 1d. Today every doc is "published" on insert.
+Phase 1d does NOT add:
 - Post revisions / version history — out of scope.
-
-Don't add these fields opportunistically in Phase 1c. The plan keeps them deferred so the schema stabilizes incrementally.
+- Per-tag entities with description / metadata — tags are simple strings on the post.
+- Multi-language content — single-language v1.

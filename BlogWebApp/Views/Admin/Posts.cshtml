@@ -1,0 +1,51 @@
+@model List<BlogWebApp.Models.BlogPost>
+@{
+    ViewData["Title"] = "Admin — Posts";
+    var filter = ViewBag.StatusFilter as string;
+}
+
+<h1>Posts</h1>
+
+<div class="mb-3">
+    <a asp-controller="Admin" asp-action="Posts" class="@(string.IsNullOrEmpty(filter) ? "fw-bold" : "")">All</a> |
+    <a asp-controller="Admin" asp-action="Posts" asp-route-status="draft" class="@(filter == "draft" ? "fw-bold" : "")">Drafts</a> |
+    <a asp-controller="Admin" asp-action="Posts" asp-route-status="scheduled" class="@(filter == "scheduled" ? "fw-bold" : "")">Scheduled</a> |
+    <a asp-controller="Admin" asp-action="Posts" asp-route-status="published" class="@(filter == "published" ? "fw-bold" : "")">Published</a>
+    <span class="float-end">
+        <a asp-controller="BlogPost" asp-action="PostNew" class="btn btn-primary btn-sm">+ New Post</a>
+    </span>
+</div>
+
+@if (!Model.Any())
+{
+    <p>No posts.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr><th>Title</th><th>Status</th><th>Publish date</th><th>Updated</th><th></th></tr>
+        </thead>
+        <tbody>
+        @foreach (var p in Model)
+        {
+            var derivedStatus = (p.Status == "published" && p.PublishedAtUtc.HasValue && p.PublishedAtUtc.Value > DateTime.UtcNow)
+                ? "scheduled" : p.Status;
+            <tr>
+                <td>@(string.IsNullOrEmpty(p.Title) ? "(untitled)" : p.Title)</td>
+                <td>@derivedStatus</td>
+                <td>@(p.PublishedAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+                <td>@((p.DateUpdated ?? p.DateCreated).ToString("yyyy-MM-dd"))</td>
+                <td>
+                    <a asp-controller="BlogPost" asp-action="PostEdit" asp-route-postId="@p.PostId">edit</a>
+                    @if (derivedStatus == "published" && !string.IsNullOrEmpty(p.Slug))
+                    {
+                        <span> · </span>
+                        <a asp-controller="BlogPost" asp-action="PostView" asp-route-slug="@p.Slug">view</a>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}

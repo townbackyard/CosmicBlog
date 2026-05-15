@@ -11,6 +11,12 @@
       "provider": "cdnjs",
       "library": "tinymce@7.6.1",
       "destination": "wwwroot/lib/tinymce/"
+    },
+    {
+      "provider": "unpkg",
+      "library": "easymde@2.18.0",
+      "destination": "wwwroot/lib/easymde/",
+      "files": [ "dist/easymde.min.js", "dist/easymde.min.css" ]
     }
   ]
 }

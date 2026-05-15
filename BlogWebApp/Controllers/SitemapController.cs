@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -52,6 +53,14 @@ namespace BlogWebApp.Controllers
                     var path = string.IsNullOrEmpty(n.Slug) ? n.PostId : n.Slug;
                     WriteUrl(w, $"{site}/notes/{path}", n.DateUpdated ?? n.DateCreated);
                 }
+
+                // Collect all distinct tags across published posts and notes and emit /tag/{tag} entries.
+                var allTags = posts.SelectMany(p => p.Tags ?? new List<string>())
+                    .Concat(notes.SelectMany(n => n.Tags ?? new List<string>()))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                foreach (var tag in allTags)
+                    WriteUrl(w, $"{site}/tag/{Uri.EscapeDataString(tag)}", DateTime.UtcNow);
 
                 w.WriteEndElement();
                 w.WriteEndDocument();
