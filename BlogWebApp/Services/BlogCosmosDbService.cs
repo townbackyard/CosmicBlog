@@ -205,8 +205,11 @@ namespace BlogWebApp.Services
         public async Task<List<BlogPost>> GetMostRecentByTypeAsync(string type, int count)
         {
             var nowUtc = DateTime.UtcNow;
+            // ORDER BY publishedAtUtc so scheduled items surface at the right position
+            // when their time arrives. Phase 1d migration backfills publishedAtUtc=
+            // dateCreated for legacy docs so pre-Phase-1d posts retain ordering.
             var query = new QueryDefinition(
-                $"SELECT TOP {count} * FROM p WHERE p.type = @type AND p.status = 'published' AND p.publishedAtUtc <= @now ORDER BY p.dateCreated DESC")
+                $"SELECT TOP {count} * FROM p WHERE p.type = @type AND p.status = 'published' AND p.publishedAtUtc <= @now ORDER BY p.publishedAtUtc DESC")
                 .WithParameter("@type", type)
                 .WithParameter("@now", nowUtc);
 
@@ -239,8 +242,9 @@ namespace BlogWebApp.Services
         public async Task<List<BlogPost>> GetActivityFeedAsync(int count)
         {
             var nowUtc = DateTime.UtcNow;
+            // ORDER BY publishedAtUtc -- see GetMostRecentByTypeAsync for rationale.
             var query = new QueryDefinition(
-                $"SELECT TOP {count} * FROM p WHERE p.type IN ('post', 'note') AND p.status = 'published' AND p.publishedAtUtc <= @now ORDER BY p.dateCreated DESC")
+                $"SELECT TOP {count} * FROM p WHERE p.type IN ('post', 'note') AND p.status = 'published' AND p.publishedAtUtc <= @now ORDER BY p.publishedAtUtc DESC")
                 .WithParameter("@now", nowUtc);
 
             var results = new List<BlogPost>();
@@ -256,8 +260,9 @@ namespace BlogWebApp.Services
         public async Task<List<BlogPost>> GetByTagAsync(string tag, int count)
         {
             var nowUtc = DateTime.UtcNow;
+            // ORDER BY publishedAtUtc -- see GetMostRecentByTypeAsync for rationale.
             var query = new QueryDefinition(
-                $"SELECT TOP {count} * FROM p WHERE p.type IN ('post', 'note') AND p.status = 'published' AND p.publishedAtUtc <= @now AND ARRAY_CONTAINS(p.tags, @tag) ORDER BY p.dateCreated DESC")
+                $"SELECT TOP {count} * FROM p WHERE p.type IN ('post', 'note') AND p.status = 'published' AND p.publishedAtUtc <= @now AND ARRAY_CONTAINS(p.tags, @tag) ORDER BY p.publishedAtUtc DESC")
                 .WithParameter("@now", nowUtc)
                 .WithParameter("@tag", tag);
 

@@ -9,8 +9,8 @@
     @Html.AntiForgeryToken()
 
     <div class="mb-3">
-        <label for="title" class="h5">Title</label> <span asp-validation-for="Title" class="text-danger"></span>
-        <input type="text" class="form-control @(ViewData.ModelState.Any(p => p.Key == "Title" && p.Value?.ValidationState == ModelValidationState.Invalid) ? "is-invalid" : "")" id="title" name="title" value="@Model.Title">
+        <label for="Title" class="h5">Title</label> <span asp-validation-for="Title" class="text-danger"></span>
+        <input type="text" class="form-control @(ViewData.ModelState.Any(p => p.Key == "Title" && p.Value?.ValidationState == ModelValidationState.Invalid) ? "is-invalid" : "")" id="Title" name="Title" value="@Model.Title">
     </div>
 
     <div class="mb-3">

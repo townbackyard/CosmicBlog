@@ -86,7 +86,7 @@ namespace BlogWebApp.Controllers
                     title = string.IsNullOrEmpty(p.Title) ? null : p.Title,
                     content_html = RenderToHtml(p.Content, p.Format),
                     external_url = p.LinkUrl,
-                    date_published = p.DateCreated.ToString("o"),
+                    date_published = (p.PublishedAtUtc ?? p.DateCreated).ToString("o"),
                     tags = new[] { p.Type },  // "post" or "note" -- surfaces stream-type in clients that show tags
                 }).ToArray(),
             };
@@ -110,18 +110,19 @@ namespace BlogWebApp.Controllers
                 new Uri(site));
             feed.Authors.Add(new SyndicationPerson(_appSettings.OwnerEmail, _appSettings.OwnerName, site));
             feed.Language = "en-us";
-            feed.LastUpdatedTime = posts.Any() ? posts.Max(p => p.DateCreated) : DateTime.UtcNow;
+            feed.LastUpdatedTime = posts.Any() ? posts.Max(p => p.PublishedAtUtc ?? p.DateCreated) : DateTime.UtcNow;
 
             feed.Items = posts.Select(p =>
             {
                 var url = $"{site}/{ItemUrlPath(p.Type, p.Slug, p.PostId)}";
+                var publishedAt = p.PublishedAtUtc ?? p.DateCreated;
                 var item = new SyndicationItem(
                     title: string.IsNullOrEmpty(p.Title) ? (p.Type == "note" ? "Note" : "Untitled") : p.Title,
                     content: SyndicationContent.CreateHtmlContent(RenderToHtml(p.Content, p.Format)),
                     itemAlternateLink: new Uri(url),
                     id: url,
-                    lastUpdatedTime: p.DateUpdated ?? p.DateCreated);
-                item.PublishDate = p.DateCreated;
+                    lastUpdatedTime: p.DateUpdated ?? publishedAt);
+                item.PublishDate = publishedAt;
                 item.Authors.Add(new SyndicationPerson(_appSettings.OwnerEmail, p.AuthorUsername, site));
                 return item;
             }).ToList();

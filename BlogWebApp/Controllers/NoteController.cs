@@ -76,8 +76,10 @@ namespace BlogWebApp.Controllers
                 ? string.Empty
                 : SlugGenerator.FromTitle(m.Title);
 
+            // Uniqueness uses the admin lookup so drafts/scheduled notes also count;
+            // otherwise two drafts could grab the same slug and collide on publish.
             if (!string.IsNullOrEmpty(slug)
-                && await _blogDbService.GetBlogPostBySlugAsync("note", slug) != null)
+                && await _blogDbService.GetBlogPostBySlugForAdminAsync("note", slug) != null)
             {
                 slug = $"{slug}-{postId.Substring(0, 8)}";
             }
@@ -115,6 +117,7 @@ namespace BlogWebApp.Controllers
 
             await _blogDbService.UpsertBlogPostAsync(note);
             ViewBag.Success = true;
+            m.PostId = postId;  // wire up autosave so subsequent edits update THIS note, not create another
             return View("NoteEdit", m);
         }
 
@@ -159,9 +162,27 @@ namespace BlogWebApp.Controllers
                 return View(m);
             }
 
-            // Preserve slug across edits (URL contract).
+            // Generate a slug if this note never got one (autosave-created drafts skip
+            // slug generation) and the admin has now given it a title.
+            // Notes legitimately allow empty titles (URL falls back to postId), so
+            // only mint a slug when there's a title to base it on.
+            if (string.IsNullOrEmpty(note.Slug) && !string.IsNullOrWhiteSpace(m.Title))
+            {
+                var newSlug = SlugGenerator.FromTitle(m.Title);
+                if (!string.IsNullOrEmpty(newSlug)
+                    && await _blogDbService.GetBlogPostBySlugForAdminAsync("note", newSlug) != null)
+                {
+                    newSlug = $"{newSlug}-{postId.Substring(0, 8)}";
+                }
+                note.Slug = newSlug;
+            }
+
             note.Title = m.Title ?? string.Empty;
             note.Content = m.Content;
+            // EasyMDE produces markdown; legacy HTML notes edited through the new editor
+            // are flipped to markdown so newly-typed syntax actually renders. Markdig
+            // passes inline HTML through unchanged.
+            note.Format = "markdown";
             note.LinkUrl = SanitizeLinkUrl(m.LinkUrl);
             note.Tags = tags;
             note.Status = m.Status;
@@ -179,8 +200,10 @@ namespace BlogWebApp.Controllers
         /// or null otherwise. The DataAnnotations <c>[Url]</c> attribute
         /// permits non-HTTP schemes (e.g. <c>javascript:alert(1)</c>) which
         /// would later render as an XSS payload inside a rendered link.
+        /// Internal so AdminDraftController (autosave) can apply the same
+        /// allowlist; both code paths persist the value the admin typed.
         /// </summary>
-        private static string? SanitizeLinkUrl(string? linkUrl)
+        internal static string? SanitizeLinkUrl(string? linkUrl)
         {
             if (string.IsNullOrWhiteSpace(linkUrl)) return null;
             if (!Uri.TryCreate(linkUrl.Trim(), UriKind.Absolute, out var uri)) return null;

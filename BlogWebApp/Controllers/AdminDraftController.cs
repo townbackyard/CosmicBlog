@@ -72,7 +72,7 @@ namespace BlogWebApp.Controllers
             bp.Title = dto.Title;
             bp.Content = dto.Content;
             if (dto.PostType == "note")
-                bp.LinkUrl = string.IsNullOrWhiteSpace(dto.LinkUrl) ? null : dto.LinkUrl;
+                bp.LinkUrl = NoteController.SanitizeLinkUrl(dto.LinkUrl);
             bp.Excerpt = dto.Excerpt;
             bp.CoverImageUrl = dto.CoverImageUrl;
             bp.Tags = (dto.Tags ?? "")

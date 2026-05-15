@@ -16,10 +16,14 @@ window.cosmicblog.adminEditor = {
         var debounceTimer = null;
         var DEBOUNCE_MS = 500;
 
-        // Status indicator beneath the editor
+        // Status indicator beneath the editor. aria-live so screen readers announce
+        // saving / saved / failed state transitions; role=status reinforces the same
+        // semantic for assistive tech that doesn't honor aria-live alone.
         var statusEl = document.createElement('div');
         statusEl.className = 'text-muted small mt-2';
         statusEl.id = 'autosave-status';
+        statusEl.setAttribute('aria-live', 'polite');
+        statusEl.setAttribute('role', 'status');
         statusEl.textContent = currentPostId ? 'Loaded existing draft' : 'Unsaved';
         textarea.parentNode.appendChild(statusEl);
 
@@ -53,6 +57,13 @@ window.cosmicblog.adminEditor = {
                     var newUrl = window.location.pathname.replace('/new', '/edit/' + resp.postId);
                     if (newUrl !== window.location.pathname) {
                         window.history.replaceState({}, '', newUrl);
+                        // The form's `action` attribute was rendered server-side at
+                        // /admin/posts/new (or /admin/notes/new); after replaceState
+                        // we need to retarget the form so an explicit Save click
+                        // hits the edit POST handler and updates THIS doc instead
+                        // of creating a second one.
+                        var form = textarea.closest('form');
+                        if (form) form.setAttribute('action', newUrl);
                     }
                 }
                 lastSavedAt = new Date(resp.savedAtUtc);

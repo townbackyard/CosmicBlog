@@ -104,9 +104,11 @@ namespace BlogWebApp.Controllers
             var postId = Guid.NewGuid().ToString();
             var slug = SlugGenerator.FromTitle(blogPostChanges.Title);
 
-            // Ensure slug uniqueness — append short suffix on collision
+            // Ensure slug uniqueness — append short suffix on collision.
+            // Uses the admin lookup so drafts/scheduled posts also count for uniqueness;
+            // otherwise two drafts could grab the same slug and collide once both publish.
             if (!string.IsNullOrEmpty(slug)
-                && await _blogDbService.GetBlogPostBySlugAsync("post", slug) != null)
+                && await _blogDbService.GetBlogPostBySlugForAdminAsync("post", slug) != null)
             {
                 slug = $"{slug}-{postId.Substring(0, 8)}";
             }
@@ -156,7 +158,8 @@ namespace BlogWebApp.Controllers
 
             //Show the view with a message that the blog post has been created.
             ViewBag.Success = true;
-            blogPostChanges.Slug = slug;  // populate so the Cancel/preview link in PostEdit.cshtml resolves to /posts/{slug}
+            blogPostChanges.PostId = postId;  // wire up the autosave endpoint so subsequent edits update THIS post, not create another
+            blogPostChanges.Slug = slug;      // so the Cancel/preview link in PostEdit.cshtml resolves to /posts/{slug}
 
             return View("PostEdit", blogPostChanges);
         }
@@ -185,9 +188,27 @@ namespace BlogWebApp.Controllers
                 return View(blogPostChanges);
             }
 
-            // Do NOT reassign bp.Slug -- slugs are stable across edits (URL contracts).
+            // Generate a slug if this post never got one (autosave-created drafts skip
+            // slug generation -- they only mint a postId). Otherwise slugs are stable
+            // across edits (URL contracts).
+            if (string.IsNullOrEmpty(bp.Slug) && !string.IsNullOrWhiteSpace(blogPostChanges.Title))
+            {
+                var newSlug = SlugGenerator.FromTitle(blogPostChanges.Title);
+                if (!string.IsNullOrEmpty(newSlug)
+                    && await _blogDbService.GetBlogPostBySlugForAdminAsync("post", newSlug) != null)
+                {
+                    newSlug = $"{newSlug}-{postId.Substring(0, 8)}";
+                }
+                if (string.IsNullOrEmpty(newSlug)) newSlug = postId.Substring(0, 8);
+                bp.Slug = newSlug;
+            }
+
             bp.Title = blogPostChanges.Title;
             bp.Content = blogPostChanges.Content;
+            // EasyMDE produces markdown; legacy HTML posts edited through the new editor
+            // are flipped to markdown so newly-typed syntax actually renders. Markdig
+            // passes inline HTML through, so legacy <p>/<a> markup keeps rendering too.
+            bp.Format = "markdown";
             bp.Excerpt = blogPostChanges.Excerpt;
             bp.CoverImageUrl = blogPostChanges.CoverImageUrl;
             bp.Tags = tags;
@@ -201,6 +222,7 @@ namespace BlogWebApp.Controllers
 
             //Show the view with a message that the blog post has been updated.
             ViewBag.Success = true;
+            blogPostChanges.Slug = bp.Slug;  // reflect any slug just minted for an autosave-created draft
 
             return View(blogPostChanges);
         }

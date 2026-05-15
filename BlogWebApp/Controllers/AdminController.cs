@@ -22,10 +22,16 @@ namespace BlogWebApp.Controllers
             var all = await _blogDbService.GetAllByTypeAsync("post", 200);
             if (!string.IsNullOrEmpty(status))
             {
+                var nowUtc = System.DateTime.UtcNow;
                 if (status == "scheduled")
                 {
-                    var nowUtc = System.DateTime.UtcNow;
                     all = all.Where(p => p.Status == "published" && p.PublishedAtUtc.HasValue && p.PublishedAtUtc.Value > nowUtc).ToList();
+                }
+                else if (status == "published")
+                {
+                    // Currently-published = status=published AND publish-time has arrived.
+                    // The "scheduled" filter is the complementary case.
+                    all = all.Where(p => p.Status == "published" && (!p.PublishedAtUtc.HasValue || p.PublishedAtUtc.Value <= nowUtc)).ToList();
                 }
                 else
                 {
@@ -42,10 +48,16 @@ namespace BlogWebApp.Controllers
             var all = await _blogDbService.GetAllByTypeAsync("note", 200);
             if (!string.IsNullOrEmpty(status))
             {
+                var nowUtc = System.DateTime.UtcNow;
                 if (status == "scheduled")
                 {
-                    var nowUtc = System.DateTime.UtcNow;
                     all = all.Where(p => p.Status == "published" && p.PublishedAtUtc.HasValue && p.PublishedAtUtc.Value > nowUtc).ToList();
+                }
+                else if (status == "published")
+                {
+                    // Currently-published = status=published AND publish-time has arrived.
+                    // The "scheduled" filter is the complementary case.
+                    all = all.Where(p => p.Status == "published" && (!p.PublishedAtUtc.HasValue || p.PublishedAtUtc.Value <= nowUtc)).ToList();
                 }
                 else
                 {
