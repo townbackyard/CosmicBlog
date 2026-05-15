@@ -12,9 +12,22 @@ window.cosmicblog.adminEditor = {
         });
 
         var currentPostId = opts.postId || '';
+
+        // Autosave throttling state.
+        //
+        // Strategy: every form change marks the doc dirty. A trailing-edge throttle
+        // fires at most one save per THROTTLE_MS while the admin is actively typing.
+        // Editor blur and beforeunload both flush immediately (the second uses
+        // sendBeacon so it survives navigation). An in-flight flag serializes
+        // network round-trips, so a slow response can never clobber newer state.
+        //
+        // Expected write volume for a 30-min focused session: ~5-10 Cosmos upserts
+        // (vs ~100-200 with the original 500ms debounce-per-keystroke design).
+        var THROTTLE_MS = 30000;
         var lastSavedAt = null;
-        var debounceTimer = null;
-        var DEBOUNCE_MS = 500;
+        var dirty = false;
+        var inflight = false;
+        var throttleTimer = null;
 
         // Status indicator beneath the editor. aria-live so screen readers announce
         // saving / saved / failed state transitions; role=status reinforces the same
@@ -41,6 +54,8 @@ window.cosmicblog.adminEditor = {
         };
 
         var doAutosave = function() {
+            inflight = true;
+            dirty = false;  // snapshot: if a later change re-sets dirty, we'll re-fire after
             var state = collectState();
             statusEl.textContent = 'Saving…';
             fetch(opts.autosaveEndpoint, {
@@ -57,32 +72,73 @@ window.cosmicblog.adminEditor = {
                     var newUrl = window.location.pathname.replace('/new', '/edit/' + resp.postId);
                     if (newUrl !== window.location.pathname) {
                         window.history.replaceState({}, '', newUrl);
-                        // The form's `action` attribute was rendered server-side at
-                        // /admin/posts/new (or /admin/notes/new); after replaceState
-                        // we need to retarget the form so an explicit Save click
-                        // hits the edit POST handler and updates THIS doc instead
-                        // of creating a second one.
+                        // Retarget the form so an explicit Save click hits the
+                        // edit POST handler instead of creating a second doc.
                         var form = textarea.closest('form');
                         if (form) form.setAttribute('action', newUrl);
                     }
                 }
                 lastSavedAt = new Date(resp.savedAtUtc);
                 statusEl.textContent = 'Saved at ' + lastSavedAt.toLocaleTimeString();
+                inflight = false;
+                // A change while we were in-flight set dirty again -- re-arm the throttle.
+                if (dirty && !throttleTimer) {
+                    throttleTimer = setTimeout(flushIfDirty, THROTTLE_MS);
+                }
             })
             .catch(function(err) {
                 statusEl.textContent = 'Autosave failed (' + err + ')';
+                inflight = false;
+                // No auto-retry: the next change re-schedules. Avoids tight loops
+                // when the endpoint is unreachable.
             });
         };
 
-        var schedule = function() {
-            if (debounceTimer) clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(doAutosave, DEBOUNCE_MS);
+        var flushIfDirty = function() {
+            throttleTimer = null;
+            if (!dirty || inflight) return;
+            doAutosave();
         };
 
-        editor.codemirror.on('change', schedule);
+        // Mark dirty and (re-)arm the throttle if it isn't already armed.
+        var markDirty = function() {
+            dirty = true;
+            if (!inflight && !throttleTimer) {
+                throttleTimer = setTimeout(flushIfDirty, THROTTLE_MS);
+            }
+        };
+
+        // Save immediately, bypassing the throttle. No-op when nothing's dirty or a
+        // save is already in-flight (that save covers us; queued state will fire on
+        // its return per doAutosave's tail).
+        var flushNow = function() {
+            if (!dirty || inflight) return;
+            if (throttleTimer) { clearTimeout(throttleTimer); throttleTimer = null; }
+            doAutosave();
+        };
+
+        // Wire up change sources.
+        editor.codemirror.on('change', markDirty);
+        editor.codemirror.on('blur', flushNow);
         ['Title', 'LinkUrl', 'Excerpt', 'CoverImageUrl'].forEach(function(name) {
             var el = document.querySelector('[name="' + name + '"]');
-            if (el) el.addEventListener('input', schedule);
+            if (el) {
+                el.addEventListener('input', markDirty);
+                el.addEventListener('blur', flushNow);
+            }
+        });
+
+        // Last-chance save on navigation. sendBeacon is fire-and-forget and survives
+        // page unload (regular fetch would be canceled). Falls back gracefully on
+        // browsers without sendBeacon -- the user just loses the post-last-throttle
+        // edits, which is the original spec's pre-1d behavior anyway.
+        window.addEventListener('beforeunload', function() {
+            if (!dirty && !inflight) return;
+            if (navigator.sendBeacon) {
+                var state = collectState();
+                var blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
+                navigator.sendBeacon(opts.autosaveEndpoint, blob);
+            }
         });
 
         // Tags: parse comma-separated input, enforce 12-cap, mirror to hidden field.
@@ -102,8 +158,9 @@ window.cosmicblog.adminEditor = {
             };
             tagsInput.addEventListener('input', function() {
                 syncTags();
-                schedule();
+                markDirty();
             });
+            tagsInput.addEventListener('blur', flushNow);
             syncTags();  // initial render
         }
 
@@ -163,6 +220,6 @@ window.cosmicblog.adminEditor = {
 
         this._editor = editor;
         this._opts = opts;
-        this.forceSave = doAutosave;
+        this.forceSave = flushNow;
     },
 };
