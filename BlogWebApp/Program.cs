@@ -197,25 +197,27 @@ static async Task<(CosmosClient, BlogCosmosDbService)> InitializeCosmosBlogClien
     await UpsertTriggerAsync(feedContainer, @"CosmosDbScripts\triggers\truncateFeed.js", TriggerOperation.All, TriggerType.Post);
 
     // Seed a Hello World post on first run so the home page is never empty.
+    const string helloWorldPostMarkdown = @"Hi there!
+
+Welcome to CosmicBlog — a learn-in-public blog engine on .NET 10 + Azure Cosmos DB. The Cosmos partition strategy is based on the Microsoft docs article [How to model and partition data on Azure Cosmos DB using a real-world example](https://docs.microsoft.com/en-us/azure/cosmos-db/how-to-model-partition-example).
+
+To login as the Blog Administrator, set `COSMICBLOG_BOOTSTRAP_ADMIN_EMAIL` and `COSMICBLOG_BOOTSTRAP_ADMIN_PASSWORD` environment variables on first run to bootstrap the admin account.
+
+Please post any issues that you have with this code to the repository at <https://github.com/townbackyard/CosmicBlog/issues>.
+";
+
     if (insertHelloWorldPost)
     {
-        const string helloWorldPostHtml = @"
-                <p>Hi there!</p>
-                <p>Welcome to CosmicBlog — a learn-in-public blog engine on .NET 10 + Azure Cosmos DB. The Cosmos partition strategy is based on the Microsoft docs article <a target='_blank' href='https://docs.microsoft.com/en-us/azure/cosmos-db/how-to-model-partition-example'>How to model and partition data on Azure Cosmos DB using a real-world example</a>.</p>
-                <p>To login as the Blog Administrator, set COSMICBLOG_BOOTSTRAP_ADMIN_EMAIL and COSMICBLOG_BOOTSTRAP_ADMIN_PASSWORD environment variables on first run to bootstrap the admin account.</p>
-                <p>Please post any issues that you have with this code to the repository at <a target='_blank' href='https://github.com/townbackyard/CosmicBlog/issues'>https://github.com/townbackyard/CosmicBlog/issues</a></p>
-        ";
-
         var helloWorldPost = new BlogPost
         {
             PostId = Guid.NewGuid().ToString(),
             Type = "post",
             Slug = "hello-world",
-            Format = "html",            // Seed content is HTML; existing markup uses <p>/<a>.
+            Format = "markdown",
             Status = "published",
             PublishedAtUtc = DateTime.UtcNow,
             Title = "Hello World!",
-            Content = helloWorldPostHtml,
+            Content = helloWorldPostMarkdown,
             AuthorId = Guid.NewGuid().ToString(),
             AuthorUsername = "HelloWorldAdmin",
             DateCreated = DateTime.UtcNow,
@@ -258,6 +260,33 @@ static async Task<(CosmosClient, BlogCosmosDbService)> InitializeCosmosBlogClien
     if (migrated > 0)
     {
         Console.WriteLine($"Phase 1d migration: backfilled {migrated} legacy Posts docs with Format/Status/PublishedAtUtc.");
+    }
+
+    // Phase 1d follow-up: convert the legacy Hello-World seed (originally
+    // committed as Format="html") to markdown so it round-trips cleanly in
+    // EasyMDE. Signature-matched on slug + format + authorUsername so user-
+    // authored posts are never touched. Idempotent: subsequent runs see
+    // format="markdown" and skip.
+    var seedQuery = new QueryDefinition(
+        "SELECT * FROM p WHERE p.slug = 'hello-world' AND p.format = 'html' AND p.userUsername = 'HelloWorldAdmin'");
+    var seedIter = postsContainer.GetItemQueryIterator<Newtonsoft.Json.Linq.JObject>(seedQuery);
+    int seedsConverted = 0;
+    while (seedIter.HasMoreResults)
+    {
+        var resp = await seedIter.ReadNextAsync();
+        foreach (var doc in resp)
+        {
+            doc["format"] = "markdown";
+            doc["content"] = helloWorldPostMarkdown;
+            var postId = doc["postId"]?.ToString()
+                ?? throw new InvalidOperationException("Hello-World seed doc missing postId during markdown conversion");
+            await postsContainer.UpsertItemAsync(doc, new PartitionKey(postId));
+            seedsConverted++;
+        }
+    }
+    if (seedsConverted > 0)
+    {
+        Console.WriteLine($"Phase 1d follow-up: converted {seedsConverted} Hello-World seed doc(s) from HTML to markdown.");
     }
 
     return (client, blogCosmosDbService);
